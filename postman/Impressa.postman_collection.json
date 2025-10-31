@@ -1,0 +1,217 @@
+{
+  "info": {
+    "name": "Impressa API",
+    "_postman_id": "impressa-api-collection",
+    "description": "Postman collection for the Impressa backend API. Imported endpoints are grouped by feature (Auth, Templates, Designs, Orders, Admin).\n\n- Use the included environment to set `{{base_url}}` and `{{authToken}}`.\n- Protected endpoints require the `Authorization: Bearer {{authToken}}` header.\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"strongpassword\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/auth/register" }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"strongpassword\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/auth/login" }
+          },
+          "response": []
+        },
+        {
+          "name": "Get current user (protected)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": { "raw": "{{base_url}}/api/auth/me" }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Templates",
+      "item": [
+        {
+          "name": "List templates",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/templates" }
+          },
+          "response": []
+        },
+        {
+          "name": "Create template",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Classic Tee\",\n  \"itemType\": \"shirt\",\n  \"category\": \"clothing\",\n  \"imageUrl\": \"https://example.com/image.jpg\",\n  \"price\": 19.99,\n  \"sizes\": [\"S\", \"M\", \"L\"],\n  \"colors\": [\"white\", \"black\"]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/templates" }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Designs",
+      "item": [
+        {
+          "name": "Create design (protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Birthday Shirt\",\n  \"itemType\": \"shirt\",\n  \"imageUrl\": \"https://example.com/design.png\",\n  \"color\": \"white\",\n  \"size\": \"M\",\n  \"textLayers\": [\n    {\n      \"text\": \"Happy Birthday\",\n      \"font\": \"Arial\",\n      \"color\": \"black\",\n      \"position\": { \"x\": 10, \"y\": 20 }\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/designs" }
+          },
+          "response": []
+        },
+        {
+          "name": "Get design by id (protected)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/designs/:id", "variable": [ { "key": "id", "value": "<designId>" } ] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get my designs (protected)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/designs/user/me" }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete design by id (protected)",
+          "request": {
+            "method": "DELETE",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/designs/:id", "variable": [ { "key": "id", "value": "<designId>" } ] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create order (protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"designId\": \"<optional-design-id>\",\n  \"itemType\": \"shirt\",\n  \"quantity\": 2,\n  \"totalAmount\": 39.98,\n  \"deliveryAddress\": \"123 Main St, City\",\n  \"paymentRef\": \"pay_12345\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/orders" }
+          },
+          "response": []
+        },
+        {
+          "name": "Get order by id (protected)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/orders/:id", "variable": [ { "key": "id", "value": "<orderId>" } ] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get my orders (protected)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/orders/user/me" }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get all orders (admin)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/admin/orders" }
+          },
+          "response": []
+        },
+        {
+          "name": "Update order status (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shipped\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/admin/orders/:id", "variable": [ { "key": "id", "value": "<orderId>" } ] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get all designs (admin)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/admin/designs" }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
