@@ -3,7 +3,7 @@
 This folder contains a Postman collection and environment for the Impressa backend API.
 
 Files:
-- `Impressa.postman_collection.json` — Postman collection (v2.1) covering Auth, Templates, Designs, Orders, and Admin endpoints.
+- `Impressa.postman_collection.json` — Postman collection (v2.1) covering Auth, Templates, Designs, Orders, Admin, Cart, and Payment endpoints.
 - `Impressa.postman_environment.json` — Environment with `{{base_url}}` and `{{authToken}}` variables.
 
 Quick start

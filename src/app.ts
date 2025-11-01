@@ -6,6 +6,8 @@ import authRoutes from "./routes/authRoutes";
 import designRoutes from "./routes/designRoutes";
 import orderRoutes from "./routes/orderRoutes";
 import adminRoutes from "./routes/adminRoutes";
+import cartRoutes from "./routes/cartRoutes";
+import paymentRoutes from "./routes/paymentRoutes";
 
 dotenv.config();
 const app = express();
@@ -20,5 +22,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/designs", designRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/pay", paymentRoutes);
 
 export default app;

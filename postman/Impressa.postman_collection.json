@@ -2,7 +2,7 @@
   "info": {
     "name": "Impressa API",
     "_postman_id": "impressa-api-collection",
-    "description": "Postman collection for the Impressa backend API. Imported endpoints are grouped by feature (Auth, Templates, Designs, Orders, Admin).\n\n- Use the included environment to set `{{base_url}}` and `{{authToken}}`.\n- Protected endpoints require the `Authorization: Bearer {{authToken}}` header.\n",
+    "description": "Postman collection for the Impressa backend API. Imported endpoints are grouped by feature (Auth, Templates, Designs, Orders, Admin, Cart, Payments).\n\n- Use the included environment to set `{{base_url}}` and `{{authToken}}`.\n- Protected endpoints require the `Authorization: Bearer {{authToken}}` header.\n",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -208,6 +208,77 @@
             "method": "GET",
             "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
             "url": { "raw": "{{base_url}}/api/admin/designs" }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Add to cart (protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemId\": \"<product-or-design-id>\",\n  \"quantity\": 1,\n  \"type\": \"template\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/cart/add" }
+          },
+          "response": []
+        },
+        {
+          "name": "Get cart (protected)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/cart" }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove item from cart (protected)",
+          "request": {
+            "method": "DELETE",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/cart/remove/:itemId", "variable": [ { "key": "itemId", "value": "<cart-item-id>" } ] }
+          },
+          "response": []
+        },
+        {
+          "name": "Clear cart (protected)",
+          "request": {
+            "method": "DELETE",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{base_url}}/api/cart/clear" }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Initialize payment (protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 39.98,\n  \"currency\": \"USD\",\n  \"orderId\": \"<order-id>\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/pay/initialize" }
           },
           "response": []
         }

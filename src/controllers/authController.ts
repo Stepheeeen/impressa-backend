@@ -32,6 +32,27 @@ export const register = async (req: Request, res: Response) => {
     }
 };
 
+export const adminRegister = async (req: Request, res: Response) => {
+    try {
+        const { email, password } = req.body;
+
+        const exists = await User.findOne({ email });
+        if (exists) return res.status(400).json({ error: "Admin already exists" });
+
+        const hashed = await bcrypt.hash(password, 10);
+
+        const admin = await User.create({
+            email,
+            password: hashed,
+            role: "admin",
+        });
+
+        res.status(201).json({ message: "Admin created successfully" });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to create admin" });
+    }
+};
+
 // Login user/admin
 export const login = async (req: Request, res: Response) => {
     try {
@@ -59,6 +80,29 @@ export const login = async (req: Request, res: Response) => {
         console.error("Login error:", err);
         res.status(500).json({ error: "Login failed" });
     }
+};
+
+// ADMIN LOGIN
+export const adminLogin = async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    const admin = await User.findOne({ email, role: "admin" });
+    if (!admin) return res.status(404).json({ error: "Admin not found" });
+
+    const match = await bcrypt.compare(password, admin.password);
+    if (!match) return res.status(401).json({ error: "Invalid credentials" });
+
+    const token = jwt.sign(
+      { id: admin._id, role: "admin" },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({ token, admin: { email: admin.email, role: admin.role } });
+  } catch (err) {
+    res.status(500).json({ error: "Login failed" });
+  }
 };
 
 // Get current user
