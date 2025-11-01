@@ -47,7 +47,8 @@ export const adminRegister = async (req: Request, res: Response) => {
             role: "admin",
         });
 
-        res.status(201).json({ message: "Admin created successfully" });
+        // return created admin info (excluding password)
+        res.status(201).json({ message: "Admin created successfully", admin: { email: admin.email, role: admin.role } });
     } catch (err) {
         res.status(500).json({ error: "Failed to create admin" });
     }
