@@ -14,8 +14,8 @@ export const register = async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Missing request body" });
         }
 
-        const { email, password } = req.body;
-        if (!email || !password) {
+        const { username, email, password } = req.body;
+        if (!username || !email || !password) {
             return res.status(400).json({ error: "Email and password are required" });
         }
 
@@ -69,7 +69,7 @@ export const login = async (req: Request, res: Response) => {
         const match = await bcrypt.compare(password, user.password);
         if (!match) return res.status(401).json({ error: "Invalid credentials" });
 
-        const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
+        const token = jwt.sign({ id: user._id, role: user.role, username: user.username, }, JWT_SECRET, {
             expiresIn: "7d",
         });
 

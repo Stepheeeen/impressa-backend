@@ -17,34 +17,111 @@ export const getTemplates = async (req: Request, res: Response) => {
   }
 };
 
-// Create a new template
+// ✅ Create New Product Template
 export const createTemplate = async (req: Request, res: Response) => {
   try {
     const {
       title,
-      category,
       itemType,
-      imageUrl,
+      category,
+      imageUrl,       // ✅ Must come from Cloudinary (frontend)
       price,
       sizes,
       colors,
-      tags
+      tags,
+      customizable,
+      isFeatured
     } = req.body;
 
-    const template = new ProductTemplate({
+    // ✅ Validate required fields
+    if (!title || !itemType || !category || !imageUrl || !price) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // ✅ Create Template Document
+    const template = await ProductTemplate.create({
       title,
-      category,
       itemType,
+      category,
       imageUrl,
       price,
-      sizes,
-      colors,
-      tags
+      sizes: sizes || [],
+      colors: colors || [],
+      tags: tags || [],
+      customizable: customizable ?? true,
+      isFeatured: isFeatured ?? false
     });
 
-    await template.save();
-    res.status(201).json(template);
-  } catch (err) {
-    res.status(400).json({ error: "Failed to create template" });
+    return res.status(201).json({
+      message: "Product uploaded successfully",
+      template
+    });
+
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to create product template" });
+  }
+};
+
+export const updateTemplate = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    const updated = await ProductTemplate.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    res.json({
+      message: "Product updated successfully",
+      product: updated,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update product" });
+  }
+};
+
+export const deleteTemplate = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    const deleted = await ProductTemplate.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    res.json({ message: "Product deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete product" });
+  }
+};
+
+export const setProductStock = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const { inStock } = req.body;
+
+    const updated = await ProductTemplate.findByIdAndUpdate(
+      id,
+      { inStock },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    res.json({
+      message: `Product marked as ${inStock ? "in stock" : "out of stock"}`,
+      product: updated,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update stock status" });
   }
 };

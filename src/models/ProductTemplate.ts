@@ -2,15 +2,16 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IProductTemplate extends Document {
   title: string;
-  itemType: string; // e.g., "shirt", "hoodie", "mug"
+  itemType: string;
   category: string;
   imageUrl: string;
   price: number;
   sizes: string[];
   colors: string[];
   tags?: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  customizable: boolean;
+  isFeatured: boolean;
+  inStock: boolean;
 }
 
 const ProductTemplateSchema: Schema = new Schema(
@@ -18,16 +19,18 @@ const ProductTemplateSchema: Schema = new Schema(
     title: { type: String, required: true },
     itemType: { type: String, required: true },
     category: { type: String, required: true },
-    imageUrl: { type: String, required: true },
+    imageUrl: { type: String, required: true }, // ✅ From Cloudinary
     price: { type: Number, required: true },
+
     sizes: [{ type: String, default: [] }],
     colors: [{ type: String, default: [] }],
-    tags: [{ type: String }]
+    tags: [{ type: String }],
+
+    customizable: { type: Boolean, default: true },  // ✅ For "Customizable Only" filter
+    isFeatured: { type: Boolean, default: false },   // ✅ For "Featured" sorting
+    inStock: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
 
-export default mongoose.model<IProductTemplate>(
-  "ProductTemplate",
-  ProductTemplateSchema
-);
+export default mongoose.model<IProductTemplate>("ProductTemplate", ProductTemplateSchema);
