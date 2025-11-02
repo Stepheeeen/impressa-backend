@@ -1,9 +1,14 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
-
 export const protect = (req: any, res: Response, next: NextFunction) => {
+  const JWT_SECRET = process.env.JWT_SECRET;
+
+  if (!JWT_SECRET) {
+    console.error("❌ JWT_SECRET is missing from environment variables");
+    return res.status(500).json({ error: "Server misconfiguration" });
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
