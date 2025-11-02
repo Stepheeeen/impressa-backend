@@ -8,6 +8,7 @@ import orderRoutes from "./routes/orderRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import cartRoutes from "./routes/cartRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
+import dashboardRoutes from "./routes/dashboardRoutes";
 
 dotenv.config();
 const app = express();
@@ -24,5 +25,6 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/pay", paymentRoutes);
+app.use("/api/admin/dashboard", dashboardRoutes);
 
 export default app;
