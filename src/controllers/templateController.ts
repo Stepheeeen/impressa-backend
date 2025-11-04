@@ -125,3 +125,66 @@ export const setProductStock = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to update stock status" });
   }
 };
+
+// ✅ Edit template safely
+export const editTemplate = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    const allowedFields = [
+      "title",
+      "category",
+      "itemType",
+      "price",
+      "imageUrl",
+      "sizes",
+      "colors",
+      "tags",
+      "customizable",
+      "inStock",
+      "isFeatured"
+    ];
+
+    // ✅ Prevent unwanted fields from updating
+    const updateData: any = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) {
+        updateData[key] = req.body[key];
+      }
+    }
+
+    const updated = await ProductTemplate.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
+
+    if (!updated) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    return res.json({
+      message: "Product updated successfully",
+      product: updated,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to update product" });
+  }
+};
+
+// ✅ Get single template by ID
+export const getTemplateById = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+
+    const template = await ProductTemplate.findById(id);
+
+    if (!template) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    return res.json(template);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch product" });
+  }
+};

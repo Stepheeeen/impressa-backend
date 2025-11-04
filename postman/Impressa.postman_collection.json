@@ -93,12 +93,18 @@
           "name": "List templates",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/api/templates" }
+            "url": { 
+              "raw": "{{base_url}}/api/templates",
+              "query": [
+                { "key": "category", "value": "clothing", "disabled": true },
+                { "key": "itemType", "value": "shirt", "disabled": true }
+              ]
+            }
           },
           "response": []
         },
         {
-          "name": "Create template",
+          "name": "Create template (protected)",
           "request": {
             "method": "POST",
             "header": [
@@ -107,10 +113,64 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Classic Tee\",\n  \"itemType\": \"shirt\",\n  \"category\": \"clothing\",\n  \"imageUrl\": \"https://example.com/image.jpg\",\n  \"price\": 19.99,\n  \"sizes\": [\"S\", \"M\", \"L\"],\n  \"colors\": [\"white\", \"black\"]\n}",
+              "raw": "{\n  \"title\": \"Classic Tee\",\n  \"itemType\": \"shirt\",\n  \"category\": \"clothing\",\n  \"imageUrl\": \"https://example.com/image.jpg\",\n  \"price\": 19.99,\n  \"sizes\": [\"S\", \"M\", \"L\"],\n  \"colors\": [\"white\", \"black\"],\n  \"tags\": [\"casual\", \"basic\"],\n  \"customizable\": true,\n  \"isFeatured\": false\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/api/templates" }
+          },
+          "response": []
+        },
+        {
+          "name": "Update template (protected)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Classic Tee\",\n  \"price\": 24.99,\n  \"isFeatured\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { 
+              "raw": "{{base_url}}/api/templates/:id",
+              "variable": [{ "key": "id", "value": "<templateId>" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete template (protected)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": { 
+              "raw": "{{base_url}}/api/templates/:id",
+              "variable": [{ "key": "id", "value": "<templateId>" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set product stock (protected)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inStock\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { 
+              "raw": "{{base_url}}/api/templates/:id/stock",
+              "variable": [{ "key": "id", "value": "<templateId>" }]
+            }
           },
           "response": []
         }
