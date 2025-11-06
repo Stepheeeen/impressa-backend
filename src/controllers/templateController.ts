@@ -48,7 +48,7 @@ export const createTemplate = async (req: Request, res: Response) => {
       sizes: sizes || [],
       colors: colors || [],
       tags: tags || [],
-      customizable: customizable ?? true,
+      customizable: customizable ?? false,
       isFeatured: isFeatured ?? false
     });
 
