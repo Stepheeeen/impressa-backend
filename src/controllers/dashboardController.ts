@@ -17,20 +17,24 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     // ✅ TOTAL CUSTOMERS
     const totalCustomers = await User.countDocuments({ role: "user" });
 
-    // ✅ TOTAL REVENUE (sum of all paid orders)
+
+    // Conversion rate: 1 USD = 1200 NGN
+    const USD_TO_NGN = 1200;
+
+    // ✅ TOTAL REVENUE (sum of all paid orders, converted to NGN)
     const revenueAgg = await Order.aggregate([
       { $match: { status: "paid" } },
       { $group: { _id: null, revenue: { $sum: "$totalAmount" } } },
     ]);
-
-    const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].revenue : 0;
+    const totalRevenueUSD = revenueAgg.length > 0 ? revenueAgg[0].revenue : 0;
+    const totalRevenue = totalRevenueUSD * USD_TO_NGN;
 
     // ✅ LAST MONTH ORDERS
     const lastMonthOrders = await Order.countDocuments({
       createdAt: { $gte: lastMonth },
     });
 
-    // ✅ LAST MONTH REVENUE
+    // ✅ LAST MONTH REVENUE (converted to NGN)
     const lastMonthRevAgg = await Order.aggregate([
       {
         $match: {
@@ -40,9 +44,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       },
       { $group: { _id: null, revenue: { $sum: "$totalAmount" } } },
     ]);
-
-    const lastMonthRevenue =
-      lastMonthRevAgg.length > 0 ? lastMonthRevAgg[0].revenue : 0;
+    const lastMonthRevenueUSD = lastMonthRevAgg.length > 0 ? lastMonthRevAgg[0].revenue : 0;
+    const lastMonthRevenue = lastMonthRevenueUSD * USD_TO_NGN;
 
     // ✅ GROWTH CALCULATIONS
     const revenueGrowth =
@@ -58,7 +61,8 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const productGrowth = 8; // Placeholder until you implement a product tracking system
     const customerGrowth = 12; // Placeholder
 
-    // ✅ MONTHLY SALES CHART (last 12 months)
+
+    // ✅ MONTHLY SALES CHART (last 12 months, sales in NGN)
     const monthlyStats = await Order.aggregate([
       {
         $group: {
@@ -76,11 +80,12 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       const monthIndex = stat._id - 1;
       monthlyData[monthIndex] = {
         orders: stat.totalOrders,
-        sales: stat.totalSales,
+        sales: stat.totalSales * USD_TO_NGN,
       };
     });
 
-    // ✅ QUICK STATS
+
+    // ✅ QUICK STATS (averageOrderValue in NGN)
     const averageOrderValue =
       totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
@@ -89,7 +94,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
     return res.json({
       totals: {
-        totalRevenue,
+        totalRevenue, // in NGN
         totalOrders,
         totalProducts,
         totalCustomers,
@@ -100,12 +105,14 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         productGrowth,
         customerGrowth,
       },
-      monthlyData,
+      monthlyData, // sales in NGN
       quickStats: {
-        averageOrderValue,
+        averageOrderValue, // in NGN
         conversionRate,
         satisfaction,
       },
+      currency: 'NGN',
+      usdToNgn: USD_TO_NGN,
     });
   } catch (error) {
     console.error(error);
