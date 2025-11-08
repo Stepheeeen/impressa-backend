@@ -1,30 +1,30 @@
 import { Request, Response } from "express";
 import Order from "../models/Order";
+import Cart from "../models/Cart";
 
 // POST /api/orders
-export const createOrder = async (req: any, res: Response) => {
-  const {
-    designId,
-    templateId,
-    itemType,
-    quantity,
-    totalAmount,
-    deliveryAddress,
-    paymentRef,
-  } = req.body;
+export const createOrderForUser = async (userId: string, reference: string) => {
+  const cart = await Cart.findOne({ user: userId });
+
+  if (!cart || cart.items.length === 0) {
+    throw new Error("Cannot create order. Cart is empty.");
+  }
 
   const order = await Order.create({
-    user: req.user.id,
-    designId,
-    templateId,
-    itemType,
-    quantity,
-    totalAmount,
-    deliveryAddress,
-    paymentRef,
+    user: userId,
+    items: cart.items,
+    paymentReference: reference,
+    total: cart.items.reduce(
+      (acc, item) => acc + (item.price ?? 0) * (item.quantity ?? 1),
+      0
+    ),
+    status: "paid",
   });
 
-  res.status(201).json(order);
+  cart.items = [];
+  await cart.save();
+
+  return order;
 };
 
 // GET /api/orders/:id

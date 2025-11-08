@@ -4,21 +4,31 @@ import axios from "axios";
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY as string;
 const CALLBACK_URL = process.env.PAYSTACK_CALLBACK_URL as string;
 
-// ✅ Initialize Paystack Payment
 export const initializePayment = async (req: any, res: Response) => {
   try {
-    const { email, amount } = req.body;
+    const userEmail = req.body.email;
+    const amount = req.body.amount;
+    const orderId = req.body.orderId;
 
-    if (!email || !amount) {
-      return res.status(400).json({ error: "Email and amount are required" });
+    if (!userEmail || !amount) {
+      return res
+        .status(400)
+        .json({ error: "Email and amount are required" });
     }
+
+    // ✅ Convert Naira → Kobo
+    const amountInKobo = Number(amount) * 100;
 
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
-        email,
-        amount: amount * 100, // Paystack accepts kobo
+        email: userEmail,
+        amount: amountInKobo,
         callback_url: CALLBACK_URL,
+        metadata: {
+          orderId,
+          userId: req.user?.id || "guest",
+        },
       },
       {
         headers: {
@@ -28,13 +38,14 @@ export const initializePayment = async (req: any, res: Response) => {
       }
     );
 
-    // ✅ Return authorization URL & reference
+    const data = response.data.data;
+
     res.json({
-      authorization_url: response.data.data.authorization_url,
-      reference: response.data.data.reference,
+      authorization_url: data.authorization_url,
+      reference: data.reference,
     });
   } catch (err: any) {
-    console.error(err.response?.data || err);
+    console.error("Paystack Init Error:", err.response?.data || err);
     res.status(500).json({ error: "Payment initialization failed" });
   }
 };
