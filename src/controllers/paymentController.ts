@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import axios from "axios";
+import { PAYSTACK_SECRET_KEY } from "../constants";
 
 export const initializePayment = async (req: any, res: Response) => {
   try {
-    const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
+    const PAYSTACK_SECRET = PAYSTACK_SECRET_KEY;
     const { email, amount, orderId, cart } = req.body;
 
     if (!email || !amount) {
