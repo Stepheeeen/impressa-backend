@@ -4,7 +4,7 @@ import { Response } from "express";
 
 export const verifyPayment = async (req: any, res: Response) => {
   try {
-    const reference = req.query.reference;
+    const reference = req.params.reference;
     if (!reference) {
       return res.status(400).json({ error: "Reference is required" });
     }
@@ -28,29 +28,24 @@ export const verifyPayment = async (req: any, res: Response) => {
     }
 
     const userId = data.metadata?.userId || req.user?.id || null;
-    const customerEmail = data.customer?.email;
-    const paidAmount = data.amount / 100;
+    const metadata = data.metadata;
 
-    // ✅ Create order
     const newOrder = await createOrderForUser({
       userId,
-      email: customerEmail,
+      email: data.customer?.email,
       reference: data.reference,
-      amount: paidAmount,
-      metadata: data.metadata,
+      metadata,
+      amount: data.amount / 100,
     });
 
     return res.json({
       message: "Payment verified & order created",
+      status: "success",
       orderId: newOrder._id,
       reference: data.reference,
-      amount: paidAmount,
-      status: data.status,
     });
-
   } catch (err: any) {
     console.error("VERIFY ERROR:", err.response?.data || err.message);
     return res.status(500).json({ error: "Payment verification failed" });
   }
 };
-

@@ -15,15 +15,13 @@ export const createOrderForUser = async ({
   email?: string;
   amount: number;
 }) => {
-
   let cartItems = [];
 
-  // ✅ Preferred source: metadata.cart
+  // ✅ Prefer cart from metadata
   if (metadata?.cart && Array.isArray(metadata.cart)) {
     cartItems = metadata.cart;
-  }
-  // ✅ Fallback: DB cart
-  else if (userId) {
+  } else if (userId) {
+    // ✅ Fallback: load cart from DB
     const cart = await Cart.findOne({ user: userId });
     if (!cart || cart.items.length === 0) {
       throw new Error("Cart is empty.");
@@ -38,24 +36,39 @@ export const createOrderForUser = async ({
   }
 
   // ✅ Calculate total
-  const totalAmount = cartItems.reduce((acc: any, item: any) => {
-    const price = item.price || item.unitPrice || 0;
+  const totalAmount = cartItems.reduce((acc: number, item: any) => {
+    const price = item.unitPrice || item.price || 0;
     return acc + price * (item.quantity ?? 1);
   }, 0);
 
-  // ✅ Create order
-  return await Order.create({
-    user: userId || null,
-    email: email || metadata?.email || null,
-    items: cartItems,
-    paymentReference: reference,
-    total: totalAmount,
-    paidAmount: amount,
-    status: "paid",
-    metadata,
-  });
-};
+  // ✅ Extract key fields from metadata (for flexibility)
+  const itemType =
+    metadata.itemType ||
+    cartItems[0]?.title ||
+    "general-item";
 
+  const quantity =
+    metadata.quantity ||
+    cartItems.reduce((acc: number, item: any) => acc + (item.quantity ?? 1), 0);
+
+  const deliveryAddress =
+    metadata.deliveryAddress ||
+    metadata.address ||
+    "No delivery address provided";
+
+  // ✅ Create order that matches your schema
+  const order = await Order.create({
+    user: userId,
+    itemType,
+    quantity,
+    totalAmount,
+    deliveryAddress,
+    paymentRef: reference,
+    status: "paid",
+  });
+
+  return order;
+};
 
 
 // GET /api/orders/:id
