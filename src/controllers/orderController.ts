@@ -93,6 +93,24 @@ export const getAllOrdersForUser = async (req:any, res:Response) => {
   }
 };
 
+export const getAllOrders = async (req: any, res: Response) => {
+  try {
+    // Optional: restrict non-admins
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: "Unauthorized access" });
+    }
+
+    const orders = await Order.find()
+      .populate("user", "name email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(orders);
+  } catch (err) {
+    console.error("Error fetching all orders:", err);
+    res.status(500).json({ error: "Failed to fetch orders" });
+  }
+};
+
 // PATCH /orders/:id/status - Mark order status
 export const updateOrderStatus = async (req:any, res:Response) => {
   try {
