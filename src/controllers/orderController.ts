@@ -96,9 +96,9 @@ export const getAllOrdersForUser = async (req:any, res:Response) => {
 export const getAllOrders = async (req: any, res: Response) => {
   try {
     // Optional: restrict non-admins
-    if (!req.user?.isAdmin) {
-      return res.status(403).json({ error: "Unauthorized access" });
-    }
+    // if (!req.user?.isAdmin) {
+    //   return res.status(403).json({ error: "Unauthorized access" });
+    // }
 
     const orders = await Order.find()
       .populate("user", "name email")
