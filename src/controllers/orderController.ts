@@ -82,7 +82,56 @@ export const getOrder = async (req: any, res: Response) => {
 };
 
 // GET /api/users/me/orders
-export const getUserOrders = async (req: any, res: Response) => {
-  const orders = await Order.find({ user: req.user.id }).sort({ createdAt: -1 });
-  res.json(orders);
+export const getAllOrdersForUser = async (req:any, res:Response) => {
+  try {
+    const userId = req.user.id;
+    const orders = await Order.find({ user: userId }).sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    console.error("Error fetching orders:", err);
+    res.status(500).json({ error: "Failed to fetch orders" });
+  }
+};
+
+// PATCH /orders/:id/status - Mark order status
+export const updateOrderStatus = async (req:any, res:Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["pending", "paid", "shipped", "delivered"].includes(status)) {
+      return res.status(400).json({ error: "Invalid order status" });
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+
+    if (!updatedOrder) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    res.json({
+      message: `Order marked as ${status}`,
+      order: updatedOrder,
+    });
+  } catch (err) {
+    console.error("Error updating order:", err);
+    res.status(500).json({ error: "Failed to update order" });
+  }
+};
+
+// DELETE /orders/:id - Delete an order (optional)
+export const deleteOrder = async (req:any, res:Response) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Order.findByIdAndDelete(id);
+    if (!deleted) return res.status(404).json({ error: "Order not found" });
+    res.json({ message: "Order deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting order:", err);
+    res.status(500).json({ error: "Failed to delete order" });
+  }
 };
