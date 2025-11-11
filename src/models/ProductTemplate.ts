@@ -19,7 +19,7 @@ const ProductTemplateSchema: Schema = new Schema(
     title: { type: String, required: true },
     itemType: { type: String, required: true },
     category: { type: String, required: true },
-    imageUrl: { type: String, required: true }, // ✅ From Cloudinary
+    imageUrls: { type: [String], required: true },
     price: { type: Number, required: true },
 
     sizes: [{ type: String, default: [] }],

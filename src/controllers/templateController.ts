@@ -17,14 +17,14 @@ export const getTemplates = async (req: Request, res: Response) => {
   }
 };
 
-// ✅ Create New Product Template
+// ✅ Create New Product Template (Supports Multiple Images)
 export const createTemplate = async (req: Request, res: Response) => {
   try {
     const {
       title,
       itemType,
       category,
-      imageUrl,       // ✅ Must come from Cloudinary (frontend)
+      imageUrls,       // ✅ Expecting ARRAY of URLs
       price,
       sizes,
       colors,
@@ -34,8 +34,10 @@ export const createTemplate = async (req: Request, res: Response) => {
     } = req.body;
 
     // ✅ Validate required fields
-    if (!title || !itemType || !category || !imageUrl || !price) {
-      return res.status(400).json({ error: "Missing required fields" });
+    if (!title || !itemType || !category || !imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0 || !price) {
+      return res.status(400).json({
+        error: "Missing required fields — ensure you provide title, itemType, category, price, and at least one image URL."
+      });
     }
 
     // ✅ Create Template Document
@@ -43,7 +45,7 @@ export const createTemplate = async (req: Request, res: Response) => {
       title,
       itemType,
       category,
-      imageUrl,
+      imageUrls,          // ✅ Stores all images
       price,
       sizes: sizes || [],
       colors: colors || [],
@@ -58,10 +60,11 @@ export const createTemplate = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    console.error(error);
+    console.error("🔥 Template Upload Error:", error);
     res.status(500).json({ error: "Failed to create product template" });
   }
 };
+
 
 export const updateTemplate = async (req: Request, res: Response) => {
   try {
