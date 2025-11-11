@@ -15,56 +15,65 @@ export const createOrderForUser = async ({
   email?: string;
   amount: number;
 }) => {
-  let cartItems = [];
+  let cartItems: any[] = [];
 
-  // ✅ Prefer cart from metadata
+  // ✅ Use cart from metadata if available
   if (metadata?.cart && Array.isArray(metadata.cart)) {
     cartItems = metadata.cart;
   } else if (userId) {
-    // ✅ Fallback: load cart from DB
+    // ✅ Otherwise load cart from DB
     const cart = await Cart.findOne({ user: userId });
-    if (!cart || cart.items.length === 0) {
+    if (!cart || !cart.items.length) {
       throw new Error("Cart is empty.");
     }
     cartItems = cart.items;
 
-    // Clear cart
+    // ✅ Clear the user's cart after fetching
     cart.items = [];
     await cart.save();
   } else {
     throw new Error("No cart data found to create order.");
   }
 
-  // ✅ Calculate total
+  // ✅ Compute total amount
   const totalAmount = cartItems.reduce((acc: number, item: any) => {
-    const price = item.unitPrice || item.price || 0;
-    return acc + price * (item.quantity ?? 1);
+    const price = item.unitPrice ?? item.price ?? 0;
+    const qty = item.quantity ?? 1;
+    return acc + price * qty;
   }, 0);
 
-  // ✅ Extract key fields from metadata (for flexibility)
-  const itemType =
-    metadata.itemType ||
-    cartItems[0]?.title ||
-    "general-item";
+  // ✅ Determine main itemType
+  const itemType = metadata?.itemType || cartItems[0]?.title || "general-item";
 
+  // ✅ Determine total quantity
   const quantity =
-    metadata.quantity ||
+    metadata?.quantity ??
     cartItems.reduce((acc: number, item: any) => acc + (item.quantity ?? 1), 0);
 
-  const deliveryAddress =
-    metadata.deliveryAddress ||
-    metadata.address ||
-    "No delivery address provided";
+  // ✅ Delivery details (address, state, country, phone)
+  const deliveryInfo = {
+    address: metadata?.deliveryAddress || metadata?.address || "No delivery address provided",
+    state: metadata?.state || "",
+    country: metadata?.country || "",
+    phone: metadata?.phone || "", // should be WhatsApp-enabled
+  };
 
-  // ✅ Create order that matches your schema
+  // ✅ Notes / instructions for user
+  const instructions = metadata?.instructions ||
+    "Delivery will take 3–7 days. Ensure your phone (WhatsApp) and email are active for order updates.";
+
+  // ✅ Create the order
   const order = await Order.create({
     user: userId,
     itemType,
     quantity,
-    totalAmount,
-    deliveryAddress,
+    totalAmount: amount || totalAmount,
+    deliveryAddress: deliveryInfo,
     paymentRef: reference,
     status: "paid",
+    email: email || metadata?.email || "",
+    items: cartItems,
+    instructions,
   });
 
   return order;
@@ -82,7 +91,7 @@ export const getOrder = async (req: any, res: Response) => {
 };
 
 // GET /api/users/me/orders
-export const getAllOrdersForUser = async (req:any, res:Response) => {
+export const getAllOrdersForUser = async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
     const orders = await Order.find({ user: userId }).sort({ createdAt: -1 });
@@ -112,7 +121,7 @@ export const getAllOrders = async (req: any, res: Response) => {
 };
 
 // PATCH /orders/:id/status - Mark order status
-export const updateOrderStatus = async (req:any, res:Response) => {
+export const updateOrderStatus = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -142,7 +151,7 @@ export const updateOrderStatus = async (req:any, res:Response) => {
 };
 
 // DELETE /orders/:id - Delete an order (optional)
-export const deleteOrder = async (req:any, res:Response) => {
+export const deleteOrder = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     const deleted = await Order.findByIdAndDelete(id);
