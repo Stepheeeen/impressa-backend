@@ -21,56 +21,49 @@ export const createOrderForUser = async ({
     cartItems = metadata.cart;
   } else if (userId) {
     const cart = await Cart.findOne({ user: userId });
-    if (!cart || !cart.items.length) {
-      throw new Error("Cart is empty.");
-    }
+    if (!cart || !cart.items.length) throw new Error("Cart is empty.");
+
     cartItems = cart.items;
     cart.items = [];
     await cart.save();
+  } else {
+    throw new Error("No cart data found to create order.");
   }
 
-  const totalAmount = cartItems.reduce((acc: number, item: any) => {
-    const price = item.unitPrice ?? item.price ?? 0;
-    const qty = item.quantity ?? 1;
-    return acc + price * qty;
-  }, 0);
+  const totalAmount = amount;
 
-  const itemType = metadata?.itemType || cartItems[0]?.title || "general-item";
+  const itemType =
+    metadata?.itemType || cartItems[0]?.title || "general-item";
 
   const quantity =
     metadata?.quantity ??
     cartItems.reduce((acc: number, item: any) => acc + (item.quantity ?? 1), 0);
 
-  // ✅ Correctly extract delivery details
-  const deliveryObj = metadata.deliveryAddress || {};
-
-  const deliveryInfo = {
-    address: deliveryObj.location || "No delivery address provided",
-    state: deliveryObj.state || "",
-    country: deliveryObj.country || "",
-    phone: metadata?.phone || "",
+  const deliveryAddress = {
+    address: metadata.address || "",
+    state: metadata.state || "",
+    country: metadata.country || "",
+    phone: metadata.phone || "",
   };
 
   const instructions =
-    metadata?.instructions ||
-    "Delivery will take 3–7 days. Ensure your WhatsApp number and email are active.";
+    "Delivery will take 3–7 days. Ensure your WhatsApp and email are active.";
 
   const order = await Order.create({
     user: userId,
     itemType,
     quantity,
-    totalAmount: amount || totalAmount,
-    deliveryAddress: deliveryInfo, // ✅ Object matches schema
+    totalAmount,
+    deliveryAddress,
     paymentRef: reference,
     status: "paid",
-    email: email || metadata?.email || "",
+    email,
     items: cartItems,
     instructions,
   });
 
   return order;
 };
-
 
 
 // GET /api/orders/:id

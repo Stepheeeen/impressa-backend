@@ -2,8 +2,6 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IOrder extends Document {
   user: mongoose.Types.ObjectId;
-  designId?: mongoose.Types.ObjectId;
-  templateId?: mongoose.Types.ObjectId;
   itemType: string;
   quantity: number;
   totalAmount: number;
@@ -15,28 +13,37 @@ export interface IOrder extends Document {
   };
   status: "pending" | "paid" | "shipped" | "delivered";
   paymentRef: string;
+  email?: string;
+  items?: any[];
+  instructions?: string;
 }
 
 const OrderSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    designId: { type: Schema.Types.ObjectId, ref: "Design" },
-    templateId: { type: Schema.Types.ObjectId, ref: "ProductTemplate" },
+
     itemType: { type: String, required: true },
     quantity: { type: Number, required: true },
     totalAmount: { type: Number, required: true },
+
     deliveryAddress: {
       address: { type: String, required: true },
       state: { type: String, required: true },
       country: { type: String, required: true },
       phone: { type: String, required: true },
     },
+
     paymentRef: { type: String, required: true },
+
     status: {
       type: String,
       enum: ["pending", "paid", "shipped", "delivered"],
-      default: "pending",
+      default: "paid",
     },
+
+    email: { type: String },
+    items: { type: Array, default: [] },
+    instructions: { type: String },
   },
   { timestamps: true }
 );

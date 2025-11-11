@@ -27,7 +27,7 @@ export const verifyPayment = async (req: any, res: Response) => {
       });
     }
 
-    const userId = data.metadata?.userId || req.user?.id || null;
+    const userId = data.metadata?.userId;
     const metadata = data.metadata;
 
     const newOrder = await createOrderForUser({
@@ -39,8 +39,8 @@ export const verifyPayment = async (req: any, res: Response) => {
     });
 
     return res.json({
-      message: "Payment verified & order created",
       status: "success",
+      message: "Payment verified & order created",
       orderId: newOrder._id,
       reference: data.reference,
     });

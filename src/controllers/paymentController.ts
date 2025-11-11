@@ -4,7 +4,18 @@ import axios from "axios";
 export const initializePayment = async (req: any, res: Response) => {
   try {
     const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
-    const { email, amount, orderId, cart, deliveryAddress, itemType, quantity } = req.body;
+    const {
+      email,
+      phone,
+      amount,
+      orderId,
+      cart,
+      country,
+      state,
+      address,
+      itemType,
+      quantity,
+    } = req.body;
 
     if (!email || !amount) {
       return res.status(400).json({ error: "Email and amount are required" });
@@ -18,13 +29,18 @@ export const initializePayment = async (req: any, res: Response) => {
         email,
         amount: amountInKobo,
         metadata: {
-          orderId,
           userId: req.user?.id || null,
-          email,
           cart,
-          deliveryAddress,
+
+          // ✅ flattened delivery info
+          phone,
+          country,
+          state,
+          address,
+
           itemType,
           quantity,
+          orderId,
           totalAmount: amount,
         },
       },
