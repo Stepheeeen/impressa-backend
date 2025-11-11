@@ -7,7 +7,12 @@ export interface IOrder extends Document {
   itemType: string;
   quantity: number;
   totalAmount: number;
-  deliveryAddress: string;
+  deliveryAddress: {
+    address: string;
+    state: string;
+    country: string;
+    phone: string;
+  };
   status: "pending" | "paid" | "shipped" | "delivered";
   paymentRef: string;
 }
@@ -20,7 +25,12 @@ const OrderSchema = new Schema(
     itemType: { type: String, required: true },
     quantity: { type: Number, required: true },
     totalAmount: { type: Number, required: true },
-    deliveryAddress: { type: String, required: true },
+    deliveryAddress: {
+      address: { type: String, required: true },
+      state: { type: String, required: true },
+      country: { type: String, required: true },
+      phone: { type: String, required: true },
+    },
     paymentRef: { type: String, required: true },
     status: {
       type: String,
