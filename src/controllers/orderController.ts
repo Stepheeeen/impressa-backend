@@ -17,58 +17,50 @@ export const createOrderForUser = async ({
 }) => {
   let cartItems: any[] = [];
 
-  // ✅ Use cart from metadata if available
   if (metadata?.cart && Array.isArray(metadata.cart)) {
     cartItems = metadata.cart;
   } else if (userId) {
-    // ✅ Otherwise load cart from DB
     const cart = await Cart.findOne({ user: userId });
     if (!cart || !cart.items.length) {
       throw new Error("Cart is empty.");
     }
     cartItems = cart.items;
-
-    // ✅ Clear the user's cart after fetching
     cart.items = [];
     await cart.save();
-  } else {
-    throw new Error("No cart data found to create order.");
   }
 
-  // ✅ Compute total amount
   const totalAmount = cartItems.reduce((acc: number, item: any) => {
     const price = item.unitPrice ?? item.price ?? 0;
     const qty = item.quantity ?? 1;
     return acc + price * qty;
   }, 0);
 
-  // ✅ Determine main itemType
   const itemType = metadata?.itemType || cartItems[0]?.title || "general-item";
 
-  // ✅ Determine total quantity
   const quantity =
     metadata?.quantity ??
     cartItems.reduce((acc: number, item: any) => acc + (item.quantity ?? 1), 0);
 
-  // ✅ Delivery details (address, state, country, phone)
+  // ✅ Correctly extract delivery details
+  const deliveryObj = metadata.deliveryAddress || {};
+
   const deliveryInfo = {
-    address: metadata?.deliveryAddress || metadata?.address || "No delivery address provided",
-    state: metadata?.state || "",
-    country: metadata?.country || "",
-    phone: metadata?.phone || "", // should be WhatsApp-enabled
+    address: deliveryObj.location || "No delivery address provided",
+    state: deliveryObj.state || "",
+    country: deliveryObj.country || "",
+    phone: metadata?.phone || "",
   };
 
-  // ✅ Notes / instructions for user
-  const instructions = metadata?.instructions ||
-    "Delivery will take 3–7 days. Ensure your phone (WhatsApp) and email are active for order updates.";
+  const instructions =
+    metadata?.instructions ||
+    "Delivery will take 3–7 days. Ensure your WhatsApp number and email are active.";
 
-  // ✅ Create the order
   const order = await Order.create({
     user: userId,
     itemType,
     quantity,
     totalAmount: amount || totalAmount,
-    deliveryAddress: deliveryInfo,
+    deliveryAddress: deliveryInfo, // ✅ Object matches schema
     paymentRef: reference,
     status: "paid",
     email: email || metadata?.email || "",
@@ -78,6 +70,7 @@ export const createOrderForUser = async ({
 
   return order;
 };
+
 
 
 // GET /api/orders/:id
