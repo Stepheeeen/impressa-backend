@@ -12,7 +12,7 @@ const getOrCreateCart = async (userId: string) => {
 export const addToCart = async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
-    const { templateId, designId, itemType, quantity = 1, price } = req.body;
+    const { templateId, designId, itemType, quantity = 1, price, size } = req.body;
 
     const cart = await getOrCreateCart(userId);
 
@@ -20,8 +20,22 @@ export const addToCart = async (req: any, res: Response) => {
     const existingItem = cart.items.find((item: any) =>
       item.templateId?.toString() === templateId &&
       item.designId?.toString() === designId &&
-      item.itemType === itemType
+      item.itemType === itemType &&
+      item.size === size
     );
+
+    // ✅ Optional: validate stock & size availability when a template is provided
+    if (templateId) {
+      const ProductTemplate = (await import("../models/ProductTemplate")).default;
+      const tpl = await ProductTemplate.findById(templateId).lean();
+      if (!tpl) return res.status(404).json({ error: "Product template not found" });
+      if (tpl.inStock === false) {
+        return res.status(400).json({ error: "Product is currently out of stock" });
+      }
+      if (size && Array.isArray(tpl.sizes) && tpl.sizes.length > 0 && !tpl.sizes.includes(size)) {
+        return res.status(400).json({ error: "Selected size is unavailable for this product" });
+      }
+    }
 
     if (existingItem) {
       // ✅ Update qty and price
@@ -33,6 +47,7 @@ export const addToCart = async (req: any, res: Response) => {
         templateId,
         designId,
         itemType,
+        size,
         quantity,
         price,
       });
@@ -59,7 +74,7 @@ export const getCart = async (req: any, res: Response) => {
       .populate({
         path: "items.templateId",
         model: "ProductTemplate",
-        select: "title imageUrl price sizes colors"
+        select: "title imageUrls price sizes colors inStock"
       })
       .populate({
         path: "items.designId",
@@ -78,7 +93,10 @@ export const getCart = async (req: any, res: Response) => {
       return {
         id: item._id,
         title: product.title || design.title || "Untitled",
-        imageUrl: product.imageUrl || design.imageUrl || null,
+        imageUrl: (Array.isArray(product.imageUrls) ? product.imageUrls[0] : product.imageUrl) || design.imageUrl || null,
+        inStock: product.inStock ?? true,
+        size: item.size ?? null,
+        availableSizes: Array.isArray(product.sizes) ? product.sizes : [],
         quantity,
         unitPrice,
         itemTotal: +(unitPrice * quantity).toFixed(2),
@@ -167,7 +185,7 @@ export const updateCartQuantity = async (req: any, res: Response) => {
       .populate({
         path: "items.templateId",
         model: "ProductTemplate",
-        select: "title imageUrl price sizes colors",
+        select: "title imageUrls price sizes colors inStock",
       })
       .populate({
         path: "items.designId",
@@ -186,7 +204,10 @@ export const updateCartQuantity = async (req: any, res: Response) => {
       return {
         id: item._id,
         title: product.title || design.title || "Untitled",
-        imageUrl: product.imageUrl || design.imageUrl || null,
+        imageUrl: (Array.isArray(product.imageUrls) ? product.imageUrls[0] : product.imageUrl) || design.imageUrl || null,
+        inStock: product.inStock ?? true,
+        size: item.size ?? null,
+        availableSizes: Array.isArray(product.sizes) ? product.sizes : [],
         quantity: qty,
         unitPrice,
         itemTotal: +(unitPrice * qty).toFixed(2),

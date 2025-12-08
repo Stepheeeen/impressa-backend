@@ -6,7 +6,19 @@ import Design from "../models/Design";
 // GET /api/admin/orders
 export const getAllOrders = async (req: Request, res: Response) => {
   try {
-    const orders = await Order.find().populate("user", "name email");
+    const orders = await Order.find()
+      .populate("user", "name email")
+      .populate({
+        path: "items.templateId",
+        model: "ProductTemplate",
+        select: "title imageUrls price sizes colors inStock",
+      })
+      .populate({
+        path: "items.designId",
+        model: "Design",
+        select: "title imageUrl",
+      })
+      .sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch orders" });

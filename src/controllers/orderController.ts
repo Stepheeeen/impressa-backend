@@ -71,7 +71,17 @@ export const getOrder = async (req: any, res: Response) => {
   const order = await Order.findOne({
     _id: req.params.id,
     user: req.user.id,
-  }).populate("designId templateId");
+  })
+    .populate({
+      path: "items.templateId",
+      model: "ProductTemplate",
+      select: "title imageUrls price sizes colors inStock",
+    })
+    .populate({
+      path: "items.designId",
+      model: "Design",
+      select: "title imageUrl",
+    });
   if (!order) return res.status(404).json({ error: "Order not found" });
   res.json(order);
 };
@@ -80,7 +90,18 @@ export const getOrder = async (req: any, res: Response) => {
 export const getAllOrdersForUser = async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
-    const orders = await Order.find({ user: userId }).sort({ createdAt: -1 });
+    const orders = await Order.find({ user: userId })
+      .populate({
+        path: "items.templateId",
+        model: "ProductTemplate",
+        select: "title imageUrls price sizes colors inStock",
+      })
+      .populate({
+        path: "items.designId",
+        model: "Design",
+        select: "title imageUrl",
+      })
+      .sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
     console.error("Error fetching orders:", err);
@@ -97,6 +118,16 @@ export const getAllOrders = async (req: any, res: Response) => {
 
     const orders = await Order.find()
       .populate("user", "name email")
+      .populate({
+        path: "items.templateId",
+        model: "ProductTemplate",
+        select: "title imageUrls price sizes colors inStock",
+      })
+      .populate({
+        path: "items.designId",
+        model: "Design",
+        select: "title imageUrl",
+      })
       .sort({ createdAt: -1 });
 
     res.status(200).json(orders);

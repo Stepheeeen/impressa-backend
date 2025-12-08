@@ -26,7 +26,7 @@ const ProductTemplateSchema: Schema = new Schema(
     colors: [{ type: String, default: [] }],
     tags: [{ type: String }],
 
-    customizable: { type: Boolean, default: true },  // ✅ For "Customizable Only" filter
+    customizable: { type: Boolean, default: false },  // ✅ For "Customizable Only" filter
     isFeatured: { type: Boolean, default: false },   // ✅ For "Featured" sorting
     inStock: { type: Boolean, default: true },
   },
