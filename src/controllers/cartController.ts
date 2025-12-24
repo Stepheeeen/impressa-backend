@@ -12,7 +12,7 @@ const getOrCreateCart = async (userId: string) => {
 export const addToCart = async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
-    const { templateId, designId, itemType, quantity = 1, price, size } = req.body;
+    const { templateId, designId, itemType, quantity = 1, price, size, color } = req.body;
 
     const cart = await getOrCreateCart(userId);
 
@@ -21,7 +21,8 @@ export const addToCart = async (req: any, res: Response) => {
       item.templateId?.toString() === templateId &&
       item.designId?.toString() === designId &&
       item.itemType === itemType &&
-      item.size === size
+      item.size === size &&
+      item.color === color
     );
 
     // ✅ Optional: validate stock & size availability when a template is provided
