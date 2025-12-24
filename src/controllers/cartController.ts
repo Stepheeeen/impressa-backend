@@ -51,6 +51,7 @@ export const addToCart = async (req: any, res: Response) => {
         size,
         quantity,
         price,
+        color,
       });
     }
 
@@ -101,6 +102,7 @@ export const getCart = async (req: any, res: Response) => {
         quantity,
         unitPrice,
         itemTotal: +(unitPrice * quantity).toFixed(2),
+        color: item.color || null
       };
     });
 
@@ -212,6 +214,7 @@ export const updateCartQuantity = async (req: any, res: Response) => {
         quantity: qty,
         unitPrice,
         itemTotal: +(unitPrice * qty).toFixed(2),
+        color: item.color || null
       };
     });
 
