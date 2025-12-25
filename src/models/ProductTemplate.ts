@@ -4,7 +4,7 @@ export interface IProductTemplate extends Document {
   title: string;
   itemType: string;
   category: string;
-  imageUrl: string;
+  imageUrls: string[]; // corrected to plural
   price: number;
   sizes: string[];
   colors: string[];
@@ -20,15 +20,16 @@ const ProductTemplateSchema: Schema = new Schema(
     title: { type: String, required: true },
     itemType: { type: String, required: true },
     category: { type: String, required: true },
-    imageUrls: { type: [String], required: true },
+    imageUrls: { type: [String], required: true }, // keep plural consistent
     price: { type: Number, required: true },
 
-    sizes: [{ type: String, default: [] }],
-    colors: [{ type: String, default: [] }],
+    // use proper array schema shape so updates of arrays work as expected
+    sizes: { type: [String], default: [] },
+    colors: { type: [String], default: [] },
     tags: [{ type: String }],
 
-    customizable: { type: Boolean, default: false },  // ✅ For "Customizable Only" filter
-    isFeatured: { type: Boolean, default: false },   // ✅ For "Featured" sorting
+    customizable: { type: Boolean, default: false },
+    isFeatured: { type: Boolean, default: false },
     inStock: { type: Boolean, default: true },
     description: { type: String },
   },

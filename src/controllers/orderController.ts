@@ -49,6 +49,11 @@ export const createOrderForUser = async ({
   const instructions =
     "Delivery will take 3–7 days. Ensure your WhatsApp and email are active.";
 
+  // derive item names from cart items where possible and persist them
+  const itemNames = cartItems.map((it: any, idx: number) => {
+    return it.title || it.name || `item-${idx + 1}`;
+  });
+
   const order = await Order.create({
     user: userId,
     itemType,
@@ -59,6 +64,7 @@ export const createOrderForUser = async ({
     status: "paid",
     email,
     items: cartItems,
+    itemNames, // <- persisted
     instructions,
   });
 
@@ -83,7 +89,23 @@ export const getOrder = async (req: any, res: Response) => {
       select: "title imageUrl",
     });
   if (!order) return res.status(404).json({ error: "Order not found" });
-  res.json(order);
+
+  // ensure each item has a name property for the panel/frontend
+  const obj = order.toObject();
+  obj.items = (obj.items || []).map((it: any, idx: number) => {
+    return {
+      ...it,
+      name:
+        it.title ||
+        it.name ||
+        it.templateId?.title || // <- optional chaining (safe if populate is null)
+        it.designId?.title ||
+        obj.itemNames?.[idx] || // <- safe access to persisted names
+        `item-${idx + 1}`,
+    };
+  });
+
+  res.json(obj);
 };
 
 // GET /api/users/me/orders
@@ -102,7 +124,23 @@ export const getAllOrdersForUser = async (req: any, res: Response) => {
         select: "title imageUrl",
       })
       .sort({ createdAt: -1 });
-    res.json(orders);
+
+    const transformed = orders.map((order: any) => {
+      const obj = order.toObject();
+      obj.items = (obj.items || []).map((it: any, idx: number) => ({
+        ...it,
+        name:
+          it.title ||
+          it.name ||
+          it.templateId?.title ||
+          it.designId?.title ||
+          obj.itemNames?.[idx] ||
+          `item-${idx + 1}`,
+      }));
+      return obj;
+    });
+
+    res.json(transformed);
   } catch (err) {
     console.error("Error fetching orders:", err);
     res.status(500).json({ error: "Failed to fetch orders" });
@@ -111,11 +149,6 @@ export const getAllOrdersForUser = async (req: any, res: Response) => {
 
 export const getAllOrders = async (req: any, res: Response) => {
   try {
-    // Optional: restrict non-admins
-    // if (!req.user?.isAdmin) {
-    //   return res.status(403).json({ error: "Unauthorized access" });
-    // }
-
     const orders = await Order.find()
       .populate("user", "name email")
       .populate({
@@ -130,7 +163,22 @@ export const getAllOrders = async (req: any, res: Response) => {
       })
       .sort({ createdAt: -1 });
 
-    res.status(200).json(orders);
+    const transformed = orders.map((order: any) => {
+      const obj = order.toObject();
+      obj.items = (obj.items || []).map((it: any, idx: number) => ({
+        ...it,
+        name:
+          it.title ||
+          it.name ||
+          it.templateId?.title ||
+          it.designId?.title ||
+          obj.itemNames?.[idx] ||
+          `item-${idx + 1}`,
+      }));
+      return obj;
+    });
+
+    res.status(200).json(transformed);
   } catch (err) {
     console.error("Error fetching all orders:", err);
     res.status(500).json({ error: "Failed to fetch orders" });

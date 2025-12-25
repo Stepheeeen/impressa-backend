@@ -141,16 +141,17 @@ export const editTemplate = async (req: Request, res: Response) => {
       "category",
       "itemType",
       "price",
-      "imageUrl",
+      "imageUrls", // <- allow plural imageUrls
       "sizes",
       "colors",
       "tags",
       "customizable",
       "inStock",
-      "isFeatured"
+      "isFeatured",
+      "description",
     ];
 
-    // ✅ Prevent unwanted fields from updating
+    // Prevent unwanted fields from updating
     const updateData: any = {};
     for (const key of allowedFields) {
       if (req.body[key] !== undefined) {

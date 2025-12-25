@@ -15,6 +15,7 @@ export interface IOrder extends Document {
   paymentRef: string;
   email?: string;
   items?: any[];
+  itemNames?: string[]; // <- added
   instructions?: string;
 }
 
@@ -43,6 +44,7 @@ const OrderSchema = new Schema(
 
     email: { type: String },
     items: { type: Array, default: [] },
+    itemNames: { type: [String], default: [] }, // <- added
     instructions: { type: String },
   },
   { timestamps: true }
