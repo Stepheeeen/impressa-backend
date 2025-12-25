@@ -12,7 +12,7 @@ const getOrCreateCart = async (userId: string) => {
 export const addToCart = async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
-    const { templateId, designId, itemType, quantity = 1, price, size, color } = req.body;
+    const { templateId, designId, itemType, quantity = 1, price, size, color, description } = req.body;
 
     const cart = await getOrCreateCart(userId);
 
@@ -22,7 +22,8 @@ export const addToCart = async (req: any, res: Response) => {
       item.designId?.toString() === designId &&
       item.itemType === itemType &&
       item.size === size &&
-      item.color === color
+      item.color === color &&
+      item.description === description
     );
 
     // ✅ Optional: validate stock & size availability when a template is provided
@@ -52,6 +53,7 @@ export const addToCart = async (req: any, res: Response) => {
         quantity,
         price,
         color,
+        description,
       });
     }
 
@@ -102,7 +104,8 @@ export const getCart = async (req: any, res: Response) => {
         quantity,
         unitPrice,
         itemTotal: +(unitPrice * quantity).toFixed(2),
-        color: item.color || null
+        color: item.color || null,
+        description: item.description || null
       };
     });
 
@@ -214,7 +217,8 @@ export const updateCartQuantity = async (req: any, res: Response) => {
         quantity: qty,
         unitPrice,
         itemTotal: +(unitPrice * qty).toFixed(2),
-        color: item.color || null
+        color: item.color || null,
+        description: item.description || null
       };
     });
 

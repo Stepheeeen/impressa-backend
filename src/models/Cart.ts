@@ -9,7 +9,8 @@ export interface ICart extends Document {
     size?: string;
     quantity: number;
     price: number;
-    color?: string
+    color?: string;
+    description?: string;
   }[];
 }
 
@@ -24,7 +25,8 @@ const CartSchema = new Schema(
         size: String,
         quantity: Number,
         price: Number,
-        color: String
+        color: String,
+        description: String,
       },
     ],
   },
