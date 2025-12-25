@@ -30,7 +30,8 @@ export const createTemplate = async (req: Request, res: Response) => {
       colors,
       tags,
       customizable,
-      isFeatured
+      isFeatured,
+      description
     } = req.body;
 
     // ✅ Validate required fields
@@ -51,7 +52,8 @@ export const createTemplate = async (req: Request, res: Response) => {
       colors: colors || [],
       tags: tags || [],
       customizable: customizable ?? false,
-      isFeatured: isFeatured ?? false
+      isFeatured: isFeatured ?? false,
+      description: description ?? null
     });
 
     return res.status(201).json({

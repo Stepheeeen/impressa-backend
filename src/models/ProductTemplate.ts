@@ -12,6 +12,7 @@ export interface IProductTemplate extends Document {
   customizable: boolean;
   isFeatured: boolean;
   inStock: boolean;
+  description?: string;
 }
 
 const ProductTemplateSchema: Schema = new Schema(
@@ -29,6 +30,7 @@ const ProductTemplateSchema: Schema = new Schema(
     customizable: { type: Boolean, default: false },  // ✅ For "Customizable Only" filter
     isFeatured: { type: Boolean, default: false },   // ✅ For "Featured" sorting
     inStock: { type: Boolean, default: true },
+    description: { type: String },
   },
   { timestamps: true }
 );
