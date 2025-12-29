@@ -20,52 +20,78 @@ export const getTemplates = async (req: Request, res: Response) => {
 // ✅ Create New Product Template (Supports Multiple Images)
 export const createTemplate = async (req: Request, res: Response) => {
   try {
-    const {
-      title,
-      itemType,
-      category,
-      imageUrls,       // ✅ Expecting ARRAY of URLs
-      price,
-      sizes,
-      colors,
-      tags,
-      customizable,
-      isFeatured,
-      description
-    } = req.body;
+    const { products } = req.body;
 
-    // ✅ Validate required fields
-    if (!title || !itemType || !category || !imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0 || !price) {
+    // ✅ Normalize input: allow single object OR array
+    const productList = Array.isArray(products)
+      ? products
+      : products
+      ? [products]
+      : [];
+
+    if (productList.length === 0) {
       return res.status(400).json({
-        error: "Missing required fields — ensure you provide title, itemType, category, price, and at least one image URL."
+        error: "No products provided",
       });
     }
 
-    // ✅ Create Template Document
-    const template = await ProductTemplate.create({
-      title,
-      itemType,
-      category,
-      imageUrls,          // ✅ Stores all images
-      price,
-      sizes: sizes || [],
-      colors: colors || [],
-      tags: tags || [],
-      customizable: customizable ?? false,
-      isFeatured: isFeatured ?? false,
-      description: description ?? null
+    // ✅ Validate each product
+    const preparedProducts = productList.map((product, index) => {
+      const {
+        title,
+        itemType,
+        category,
+        imageUrls,
+        price,
+        sizes,
+        colors,
+        tags,
+        customizable,
+        isFeatured,
+        description,
+      } = product;
+
+      if (
+        !title ||
+        !itemType ||
+        !category ||
+        !price ||
+        !Array.isArray(imageUrls) ||
+        imageUrls.length === 0
+      ) {
+        throw new Error(`Invalid product data at index ${index}`);
+      }
+
+      return {
+        title,
+        itemType,
+        category,
+        imageUrls,
+        price,
+        sizes: sizes || [],
+        colors: colors || [],
+        tags: tags || [],
+        customizable: customizable ?? false,
+        isFeatured: isFeatured ?? false,
+        description: description ?? null,
+      };
     });
+
+    // ✅ Bulk insert
+    const templates = await ProductTemplate.insertMany(preparedProducts);
 
     return res.status(201).json({
-      message: "Product uploaded successfully",
-      template
+      message: `${templates.length} product(s) uploaded successfully`,
+      templates,
     });
-
   } catch (error: any) {
-    console.error("🔥 Template Upload Error:", error);
-    res.status(500).json({ error: "Failed to create product template" });
+    console.error("🔥 Bulk Template Upload Error:", error);
+    return res.status(500).json({
+      error: error.message || "Failed to create product templates",
+    });
   }
 };
+
 
 
 export const updateTemplate = async (req: Request, res: Response) => {
