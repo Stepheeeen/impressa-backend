@@ -1,6 +1,14 @@
 import { Request, Response } from "express";
 import ProductTemplate from "../models/ProductTemplate";
 
+const normalizeStringArray = (value: any): string[] => {
+  if (value === undefined || value === null) return [];
+  const arr = Array.isArray(value) ? value : [value];
+  return arr
+    .map((v) => (v === undefined || v === null ? "" : String(v).trim()))
+    .filter((v) => v.length > 0);
+};
+
 // Get all templates
 export const getTemplates = async (req: Request, res: Response) => {
   try {
@@ -68,9 +76,9 @@ export const createTemplate = async (req: Request, res: Response) => {
         category,
         imageUrls,
         price,
-        sizes: sizes || [],
-        colors: colors || [],
-        tags: tags || [],
+        sizes: normalizeStringArray(sizes),
+        colors: normalizeStringArray(colors),
+        tags: normalizeStringArray(tags),
         customizable: customizable ?? false,
         isFeatured: isFeatured ?? false,
         description: description ?? null,
@@ -97,6 +105,16 @@ export const createTemplate = async (req: Request, res: Response) => {
 export const updateTemplate = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
+
+    if (req.body.sizes !== undefined) {
+      req.body.sizes = normalizeStringArray(req.body.sizes);
+    }
+    if (req.body.colors !== undefined) {
+      req.body.colors = normalizeStringArray(req.body.colors);
+    }
+    if (req.body.tags !== undefined) {
+      req.body.tags = normalizeStringArray(req.body.tags);
+    }
 
     const updated = await ProductTemplate.findByIdAndUpdate(
       id,
@@ -183,6 +201,16 @@ export const editTemplate = async (req: Request, res: Response) => {
       if (req.body[key] !== undefined) {
         updateData[key] = req.body[key];
       }
+    }
+
+    if (updateData.sizes !== undefined) {
+      updateData.sizes = normalizeStringArray(updateData.sizes);
+    }
+    if (updateData.colors !== undefined) {
+      updateData.colors = normalizeStringArray(updateData.colors);
+    }
+    if (updateData.tags !== undefined) {
+      updateData.tags = normalizeStringArray(updateData.tags);
     }
 
     const updated = await ProductTemplate.findByIdAndUpdate(id, updateData, {
