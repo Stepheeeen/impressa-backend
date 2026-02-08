@@ -74,10 +74,13 @@ export const createOrderForUser = async ({
 
 // GET /api/orders/:id
 export const getOrder = async (req: any, res: Response) => {
-  const order = await Order.findOne({
-    _id: req.params.id,
-    user: req.user.id,
-  })
+  const isAdmin = req.user?.role === "admin";
+
+  const orderQuery = isAdmin
+    ? { _id: req.params.id }
+    : { _id: req.params.id, user: req.user.id };
+
+  const order = await Order.findOne(orderQuery)
     .populate({
       path: "items.templateId",
       model: "ProductTemplate",
