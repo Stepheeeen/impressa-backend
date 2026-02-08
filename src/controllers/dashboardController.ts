@@ -18,23 +18,19 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const totalCustomers = await User.countDocuments({ role: "user" });
 
 
-    // Conversion rate: 1 USD = 1200 NGN
-    const USD_TO_NGN = 1200;
-
-    // ✅ TOTAL REVENUE (sum of all paid orders, converted to NGN)
+    // ✅ TOTAL REVENUE (sum of all paid orders, in NGN)
     const revenueAgg = await Order.aggregate([
       { $match: { status: "paid" } },
       { $group: { _id: null, revenue: { $sum: "$totalAmount" } } },
     ]);
-    const totalRevenueUSD = revenueAgg.length > 0 ? revenueAgg[0].revenue : 0;
-    const totalRevenue = totalRevenueUSD * USD_TO_NGN;
+    const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].revenue : 0;
 
     // ✅ LAST MONTH ORDERS
     const lastMonthOrders = await Order.countDocuments({
       createdAt: { $gte: lastMonth },
     });
 
-    // ✅ LAST MONTH REVENUE (converted to NGN)
+    // ✅ LAST MONTH REVENUE (in NGN)
     const lastMonthRevAgg = await Order.aggregate([
       {
         $match: {
@@ -44,8 +40,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       },
       { $group: { _id: null, revenue: { $sum: "$totalAmount" } } },
     ]);
-    const lastMonthRevenueUSD = lastMonthRevAgg.length > 0 ? lastMonthRevAgg[0].revenue : 0;
-    const lastMonthRevenue = lastMonthRevenueUSD * USD_TO_NGN;
+    const lastMonthRevenue = lastMonthRevAgg.length > 0 ? lastMonthRevAgg[0].revenue : 0;
 
     // ✅ GROWTH CALCULATIONS
     const revenueGrowth =
@@ -80,7 +75,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       const monthIndex = stat._id - 1;
       monthlyData[monthIndex] = {
         orders: stat.totalOrders,
-        sales: stat.totalSales * USD_TO_NGN,
+        sales: stat.totalSales,
       };
     });
 
@@ -112,7 +107,6 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         satisfaction,
       },
       currency: 'NGN',
-      usdToNgn: USD_TO_NGN,
     });
   } catch (error) {
     console.error(error);
