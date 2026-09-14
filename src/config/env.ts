@@ -19,6 +19,14 @@ const EnvSchema = z.object({
   SENTRY_DSN: z.string().optional(),
   // Number of proxies in front of the app (Render's load balancer), so rate limits see the real client IP.
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
+  // Optional Expo access token, required only if "enhanced push security" is turned on for the Expo project.
+  EXPO_ACCESS_TOKEN: z.string().optional(),
+  // App versions below these are shown a blocking "update required" screen.
+  MIN_APP_VERSION_IOS: z.string().regex(/^\d+\.\d+\.\d+$/, "Use a version like 1.0.0").default("1.0.0"),
+  MIN_APP_VERSION_ANDROID: z.string().regex(/^\d+\.\d+\.\d+$/, "Use a version like 1.0.0").default("1.0.0"),
+  // Known once the app is live on the App Store.
+  IOS_APP_STORE_URL: z.url().optional(),
+  ANDROID_PLAY_STORE_URL: z.url().default("https://play.google.com/store/apps/details?id=com.impressa.app"),
 });
 
 const REQUIRED_IN_PRODUCTION = ["CORS_ORIGINS", "APP_URL", "RESEND_API_KEY", "EMAIL_FROM"] as const;

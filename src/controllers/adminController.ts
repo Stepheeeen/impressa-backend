@@ -4,6 +4,7 @@ import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler";
 import Design from "../models/Design";
 import Order, { ORDER_STATUSES } from "../models/Order";
+import { changeOrderStatus } from "../services/orders";
 
 const StatusSchema = z.object({
   status: z.enum(ORDER_STATUSES, { error: "Invalid order status" }),
@@ -31,7 +32,7 @@ export const getAllOrders = async (_req: Request, res: Response) => {
 export const updateOrderStatus = async (req: Request, res: Response) => {
   const { status } = StatusSchema.parse(req.body ?? {});
 
-  const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+  const order = await changeOrderStatus(req.params.id, status);
   if (!order) throw new HttpError(404, "Order not found");
 
   res.json({ message: "Order updated", order });

@@ -1,6 +1,21 @@
 import * as Sentry from "@sentry/node";
-import Order from "../models/Order";
+import Order, { OrderStatus } from "../models/Order";
 import type { PaystackTransaction } from "./paystack";
+import { notifyOrderStatus } from "./push";
+
+// Updates an order's status and notifies the customer when it actually changed. Returns null if the order doesn't exist.
+export async function changeOrderStatus(orderId: string, status: OrderStatus) {
+  const previous = await Order.findByIdAndUpdate(orderId, { status }, { new: false });
+  if (!previous) return null;
+
+  if (previous.status !== status) {
+    notifyOrderStatus({ userId: String(previous.user), orderId: String(previous._id), status });
+  }
+
+  const order = previous.toObject();
+  order.status = status;
+  return order;
+}
 
 export class PaymentMismatchError extends Error {
   constructor(message: string) {

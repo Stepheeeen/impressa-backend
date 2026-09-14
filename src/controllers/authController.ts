@@ -7,6 +7,7 @@ import { env } from "../config/env";
 import { HttpError } from "../middleware/errorHandler";
 import Cart from "../models/Cart";
 import Design from "../models/Design";
+import DeviceToken from "../models/DeviceToken";
 import Order from "../models/Order";
 import User, { IUser } from "../models/User";
 import { sendPasswordResetEmail } from "../services/email";
@@ -184,7 +185,11 @@ export const deleteAccount = async (req: Request, res: Response) => {
     { user: user._id },
     { $set: { "deliveryAddress.address": "Deleted", "deliveryAddress.phone": "Deleted" }, $unset: { email: 1 } }
   );
-  await Promise.all([Cart.deleteMany({ user: user._id }), Design.deleteMany({ user: user._id })]);
+  await Promise.all([
+    Cart.deleteMany({ user: user._id }),
+    Design.deleteMany({ user: user._id }),
+    DeviceToken.deleteMany({ user: user._id }),
+  ]);
   await User.deleteOne({ _id: user._id });
 
   res.json({ message: "Your account has been deleted." });

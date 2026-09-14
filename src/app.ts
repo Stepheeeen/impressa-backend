@@ -14,6 +14,8 @@ import adminRoutes from "./routes/adminRoutes";
 import cartRoutes from "./routes/cartRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
+import deviceRoutes from "./routes/deviceRoutes";
+import appConfigRoutes from "./routes/appConfigRoutes";
 
 const app = express();
 
@@ -53,6 +55,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/pay", paymentRoutes);
 app.use("/api/admin/dashboard", dashboardRoutes);
+app.use("/api/devices", deviceRoutes);
+app.use("/api/app", appConfigRoutes);
 
 app.use(notFound);
 Sentry.setupExpressErrorHandler(app);
