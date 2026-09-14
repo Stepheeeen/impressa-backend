@@ -309,6 +309,7 @@ export function toCustomerFulfilment(fulfilment: any, returnWindowDays: number) 
       size: item.size ?? null,
       color: item.color ?? null,
       imageUrl: item.imageUrl ?? null,
+      returnedQuantity: item.returnedQuantity ?? 0,
     })),
     deliveredAt: fulfilment.deliveredAt ?? null,
     returnWindowEndsAt: fulfilment.deliveredAt ? daysFromNow(returnWindowDays, new Date(fulfilment.deliveredAt)) : null,
