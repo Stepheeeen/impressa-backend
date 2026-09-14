@@ -19,3 +19,9 @@ export function startOfLagosMonth(date = new Date()) {
 }
 
 export const daysFromNow = (days: number, from = new Date()) => new Date(from.getTime() + days * DAY_MS);
+
+export const hoursFromNow = (hours: number, from = new Date()) => new Date(from.getTime() + hours * 60 * 60 * 1000);
+
+// "14 Sept" in Lagos time, for messages to customers and merchants.
+export const formatLagosDate = (date: Date) =>
+  date.toLocaleDateString("en-NG", { day: "numeric", month: "short", timeZone: "Africa/Lagos" });

@@ -36,6 +36,7 @@ export interface IOrder extends Document {
   };
   walletShortfallKobo?: number;
   cashbackKobo?: number;
+  cardRefundedKobo?: number;
 }
 
 const OrderSchema = new Schema(
@@ -99,6 +100,8 @@ const OrderSchema = new Schema(
     // Wallet credit that was already gone when a late payment completed; needs manual follow-up.
     walletShortfallKobo: { type: Number },
     cashbackKobo: { type: Number },
+    // Refunded to the card so far, so refunds never exceed what the card paid.
+    cardRefundedKobo: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

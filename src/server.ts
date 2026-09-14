@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/node";
 import mongoose from "mongoose";
 import app from "./app";
 import { env } from "./config/env";
+import { scheduleMarketplaceJobs } from "./jobs/marketplaceJobs";
 import { scheduleWalletJobs } from "./jobs/walletJobs";
 import Order from "./models/Order";
 
@@ -30,10 +31,13 @@ async function start() {
 
   // Expires wallet credit, settles checkout holds, sends expiry reminders and checks the ledger.
   const walletJobs = scheduleWalletJobs();
+  // Escalates and closes returns, and pays merchants once their returns window has passed.
+  const marketplaceJobs = scheduleMarketplaceJobs();
 
   const shutdown = (signal: string) => {
     console.log(`${signal} received, shutting down`);
     clearInterval(walletJobs);
+    clearInterval(marketplaceJobs);
     server.close(() => {
       mongoose.connection.close().finally(() => process.exit(0));
     });

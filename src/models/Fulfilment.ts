@@ -17,6 +17,7 @@ export type FulfilmentItem = {
   imageUrl?: string;
   // Another customer bought the last units before this payment completed.
   oversold?: boolean;
+  returnedQuantity?: number;
 };
 
 // One seller's part of an order: the parcel they ship, and what they're paid for it.
@@ -40,6 +41,10 @@ export interface IFulfilment extends Document {
   stockReserved: boolean;
   needsAttention: boolean;
   payout: { status: PayoutStatus; payoutId?: mongoose.Types.ObjectId | null; paidAt?: Date | null };
+  // Value of items refunded through returns; they no longer count toward the payout.
+  refundedItemsKobo: number;
+  cancelledAt?: Date | null;
+  cancelReason?: string;
 }
 
 const FulfilmentSchema = new Schema(
@@ -60,6 +65,7 @@ const FulfilmentSchema = new Schema(
           color: String,
           imageUrl: String,
           oversold: Boolean,
+          returnedQuantity: { type: Number, default: 0 },
         },
       ],
       default: [],
@@ -87,6 +93,9 @@ const FulfilmentSchema = new Schema(
       payoutId: { type: Schema.Types.ObjectId, ref: "Payout", default: null },
       paidAt: { type: Date, default: null },
     },
+    refundedItemsKobo: { type: Number, default: 0 },
+    cancelledAt: { type: Date, default: null },
+    cancelReason: { type: String, default: "" },
   },
   { timestamps: true }
 );

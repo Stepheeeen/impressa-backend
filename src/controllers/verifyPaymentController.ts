@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { env } from "../config/env";
 import { HttpError } from "../middleware/errorHandler";
 import { createOrderFromPayment, parseMetadata, PaymentMismatchError } from "../services/orders";
+import { applyTransferStatus } from "../services/payouts";
 import { verifyTransaction } from "../services/paystack";
 
 const REFERENCE = /^[A-Za-z0-9._=-]{1,100}$/;
@@ -46,6 +47,14 @@ export const paystackWebhook = async (req: Request, res: Response) => {
   if (!valid) return res.status(401).json({ error: "Invalid signature" });
 
   const event = req.body;
+
+  // Merchant payouts report back through transfer events.
+  if (typeof event?.event === "string" && event.event.startsWith("transfer.") && event.data?.reference) {
+    const status = event.event === "transfer.success" ? "success" : event.event === "transfer.reversed" ? "reversed" : "failed";
+    await applyTransferStatus(String(event.data.reference), status, event.data.transfer_code, event.data.reason);
+    return res.json({ received: true });
+  }
+
   if (event?.event !== "charge.success" || event.data?.status !== "success") {
     return res.json({ received: true });
   }

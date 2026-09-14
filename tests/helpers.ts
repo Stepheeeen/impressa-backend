@@ -3,6 +3,8 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
+import Fulfilment from "../src/models/Fulfilment";
+import MarketplaceSettings from "../src/models/MarketplaceSettings";
 import Merchant, { MerchantStatus } from "../src/models/Merchant";
 import Order, { OrderStatus } from "../src/models/Order";
 import ProductTemplate from "../src/models/ProductTemplate";
@@ -84,6 +86,74 @@ export async function createMerchant(
     commissionPercent: overrides.commissionPercent ?? null,
   });
   return { owner, merchant };
+}
+
+export function setMarketplaceSettings(values: Record<string, unknown>) {
+  return MarketplaceSettings.updateOne({ key: "marketplace" }, { $set: values }, { upsert: true, setDefaultsOnInsert: true });
+}
+
+type ParcelOptions = {
+  merchant?: { _id: unknown; businessName: string } | null;
+  customerId: unknown;
+  status?: "paid" | "shipped" | "delivered";
+  deliveredDaysAgo?: number;
+  quantity?: number;
+  unitPriceKobo?: number;
+  deliveryFeeKobo?: number;
+  commissionPercent?: number;
+  // How the order was paid; defaults to all by card with no coupon.
+  pricing?: { subtotalKobo: number; discountKobo: number; walletAppliedKobo: number; cardPaidKobo: number };
+};
+
+// A paid order with a single parcel, built directly for tests that don't need the checkout flow.
+export async function createParcel({
+  merchant = null,
+  customerId,
+  status = "delivered",
+  deliveredDaysAgo = 1,
+  quantity = 2,
+  unitPriceKobo = 2_500_000,
+  deliveryFeeKobo = 200_000,
+  commissionPercent = 10,
+  pricing,
+}: ParcelOptions) {
+  const itemsSubtotalKobo = quantity * unitPriceKobo;
+  const product = await createProduct({ merchant: merchant?._id ?? null, price: unitPriceKobo / 100, stockQuantity: 10 });
+  const order = await Order.create({
+    user: customerId,
+    itemType: "Adire kaftan",
+    quantity,
+    totalAmount: (itemsSubtotalKobo + deliveryFeeKobo) / 100,
+    deliveryAddress: { address: "12 Admiralty Way, Lekki", state: "Lagos", country: "Nigeria", phone: "08012345678" },
+    paymentRef: `ref_${suffix()}`,
+    status,
+    pricing: {
+      subtotalKobo: pricing?.subtotalKobo ?? itemsSubtotalKobo,
+      deliveryFeeKobo,
+      discountKobo: pricing?.discountKobo ?? 0,
+      walletAppliedKobo: pricing?.walletAppliedKobo ?? 0,
+      cardPaidKobo: pricing?.cardPaidKobo ?? itemsSubtotalKobo + deliveryFeeKobo,
+    },
+  });
+  const commissionKobo = Math.floor((itemsSubtotalKobo * commissionPercent) / 100);
+  const fulfilment = await Fulfilment.create({
+    order: order._id,
+    user: customerId,
+    merchant: merchant?._id ?? null,
+    sellerName: merchant?.businessName ?? "Impressa",
+    items: [{ templateId: product._id, title: "Adire kaftan", quantity, unitPriceKobo }],
+    itemsSubtotalKobo,
+    deliveryFeeKobo,
+    commissionPercent: merchant ? commissionPercent : 0,
+    commissionKobo: merchant ? commissionKobo : 0,
+    payoutKobo: merchant ? itemsSubtotalKobo - commissionKobo + deliveryFeeKobo : 0,
+    status,
+    statusHistory: [{ status, at: new Date() }],
+    deliveredAt: status === "delivered" ? new Date(Date.now() - deliveredDaysAgo * 24 * 60 * 60 * 1000) : null,
+    stockReserved: true,
+    payout: { status: merchant ? "pending" : "not-applicable" },
+  });
+  return { order, fulfilment, product };
 }
 
 export function setRewardSettings(values: Record<string, unknown>) {

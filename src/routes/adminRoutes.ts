@@ -31,6 +31,15 @@ import {
   updateMarketplaceSettings,
 } from "../controllers/adminMerchantsController";
 import {
+  adminCancelFulfilment,
+  approveReturnAsAdmin,
+  declineReturnAsAdmin,
+  deleteReview,
+  listAllPayouts,
+  listAllReturns,
+  retryPayout,
+} from "../controllers/marketplaceController";
+import {
   createBanner,
   createPriceBand,
   deleteBanner,
@@ -89,5 +98,15 @@ router.get("/marketplace/settings", asyncHandler(getAdminMarketplaceSettings));
 router.put("/marketplace/settings", asyncHandler(updateMarketplaceSettings));
 router.patch("/fulfilments/:id", validId, asyncHandler(overrideFulfilment));
 router.patch("/products/:id/visibility", validId, asyncHandler(setProductVisibility));
+router.post("/fulfilments/:id/cancel", validId, asyncHandler(adminCancelFulfilment));
+
+router.get("/returns", asyncHandler(listAllReturns));
+router.post("/returns/:id/approve", validId, asyncHandler(approveReturnAsAdmin));
+router.post("/returns/:id/decline", validId, asyncHandler(declineReturnAsAdmin));
+
+router.get("/payouts", asyncHandler(listAllPayouts));
+router.post("/payouts/:id/retry", validId, asyncHandler(retryPayout));
+
+router.delete("/reviews/:id", validId, asyncHandler(deleteReview));
 
 export default router;

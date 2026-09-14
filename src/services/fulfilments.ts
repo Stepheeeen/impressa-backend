@@ -8,6 +8,7 @@ import { getMarketplaceSettings } from "./marketplaceSettings";
 import { changeOrderStatus } from "./orderStatus";
 import { formatNaira, toKobo, toNaira } from "./pricing";
 import { notifyUser, orderNumber } from "./push";
+import { paidItemsValueKobo, refundOrderAmount } from "./refunds";
 import { daysFromNow } from "./time";
 
 // Delivery stages (from the admin panel or merchant mode) move orders and parcels along.
@@ -243,6 +244,51 @@ export async function createFulfilmentsForOrder(order: IOrder, metadata: Record<
   }
 
   await reserveStock(order._id);
+}
+
+// Cancels a parcel that hasn't shipped: refunds its items and delivery fee (to the card where possible,
+// since the customer didn't choose this) and puts the stock back. Returns null if it can't be cancelled.
+export async function cancelFulfilment(fulfilmentId: string, { reason, scope = {} }: { reason: string; scope?: { merchant?: unknown } }) {
+  const now = new Date();
+  const fulfilment = await Fulfilment.findOneAndUpdate(
+    { _id: fulfilmentId, status: "paid", ...scope },
+    {
+      $set: { status: "cancelled", cancelReason: reason, cancelledAt: now, "payout.status": "not-applicable" },
+      $push: { statusHistory: { status: "cancelled", at: now } },
+    },
+    { new: true }
+  );
+  if (!fulfilment) return null;
+
+  const order = await Order.findById(fulfilment.order).lean();
+  const refundKobo = paidItemsValueKobo(order, fulfilment.itemsSubtotalKobo) + fulfilment.deliveryFeeKobo;
+  const refund = await refundOrderAmount({
+    orderId: String(fulfilment.order),
+    amountKobo: refundKobo,
+    destination: "card",
+    idempotencyKey: `cancel:${fulfilment._id}`,
+    note: `Cancelled by seller: ${reason}`,
+  });
+
+  if (fulfilment.stockReserved) {
+    for (const item of fulfilment.items) {
+      if (!item.templateId || item.oversold) continue;
+      await ProductTemplate.updateOne(
+        { _id: item.templateId, stockQuantity: { $ne: null } },
+        { $inc: { stockQuantity: item.quantity } }
+      );
+    }
+  }
+
+  notifyUser({
+    userId: String(fulfilment.user),
+    title: "Part of your order was cancelled",
+    body: `${fulfilment.sellerName} couldn't send ${itemCountText(fulfilment)} from order #${orderNumber(String(fulfilment.order))}. ${formatNaira(refundKobo)} is being refunded${refund.walletKobo > 0 && refund.cardKobo === 0 ? " to your wallet" : ""}.`,
+    data: { type: "order", orderId: String(fulfilment.order) },
+  });
+
+  await syncOrderStatus(String(fulfilment.order));
+  return fulfilment;
 }
 
 export function toCustomerFulfilment(fulfilment: any, returnWindowDays: number) {
