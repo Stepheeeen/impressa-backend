@@ -27,10 +27,13 @@ export async function initializeTransaction({
   email,
   amountKobo,
   metadata,
+  reference,
 }: {
   email: string;
   amountKobo: number;
   metadata: Record<string, unknown>;
+  // Our own reference, so wallet credit can be held against it before Paystack is called.
+  reference?: string;
 }) {
   try {
     const { data } = await client.post("/transaction/initialize", {
@@ -38,6 +41,7 @@ export async function initializeTransaction({
       amount: amountKobo,
       currency: "NGN",
       metadata,
+      reference,
     });
     return {
       authorizationUrl: data.data.authorization_url as string,

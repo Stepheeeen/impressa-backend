@@ -6,6 +6,7 @@ export const MAX_ITEM_QUANTITY = 99;
 
 export const toKobo = (naira: number) => Math.round(naira * 100);
 export const toNaira = (kobo: number) => kobo / 100;
+export const formatNaira = (kobo: number) => `₦${toNaira(kobo).toLocaleString("en-NG")}`;
 
 export type PricedLine = {
   id: string;

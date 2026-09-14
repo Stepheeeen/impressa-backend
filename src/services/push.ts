@@ -11,26 +11,20 @@ export const isPushToken = (token: unknown): token is string => Expo.isExpoPushT
 // Same "Order #XXXXXX" the app shows.
 export const orderNumber = (orderId: string) => orderId.slice(-6).toUpperCase();
 
-const STATUS_MESSAGES: Partial<Record<OrderStatus, { title: string; body: (number: string) => string }>> = {
-  shipped: { title: "Your order is on its way", body: (number) => `Order #${number} has been shipped.` },
-  delivered: { title: "Your order has been delivered", body: (number) => `Order #${number} has been delivered. Enjoy!` },
-};
+type UserPush = { userId: string; title: string; body: string; data: Record<string, unknown> };
 
-type OrderStatusPush = { userId: string; orderId: string; status: OrderStatus };
-
-export async function sendOrderStatusPush({ userId, orderId, status }: OrderStatusPush) {
-  const template = STATUS_MESSAGES[status];
-  if (!template) return;
-
+// Sends a notification to every device signed in to this account.
+export async function sendUserPush({ userId, title, body, data }: UserPush) {
   const devices = await DeviceToken.find({ user: userId }).lean();
   const messages: ExpoPushMessage[] = devices
     .filter((device) => isPushToken(device.token))
     .map((device) => ({
       to: device.token,
-      title: template.title,
-      body: template.body(orderNumber(orderId)),
-      data: { type: "order", orderId },
+      title,
+      body,
+      data,
       sound: "default",
+      // The app's Android notification channel.
       channelId: "orders",
     }));
   if (messages.length === 0) return;
@@ -50,11 +44,36 @@ export async function sendOrderStatusPush({ userId, orderId, status }: OrderStat
 
   const failures = tickets.filter((ticket) => ticket.status === "error");
   if (failures.length > staleTokens.length) {
-    console.error(`Order ${orderId} push had ${failures.length} failed ticket(s):`, failures);
+    console.error(`Push to user ${userId} had ${failures.length} failed ticket(s):`, failures);
   }
 }
 
-// A failed notification must never fail the status update that triggered it.
+// A failed notification must never fail the action that triggered it.
+export function notifyUser(push: UserPush) {
+  sendUserPush(push).catch((err) => {
+    console.error(`Push to user ${push.userId} failed:`, err);
+    Sentry.captureException(err);
+  });
+}
+
+const STATUS_MESSAGES: Partial<Record<OrderStatus, { title: string; body: (number: string) => string }>> = {
+  shipped: { title: "Your order is on its way", body: (number) => `Order #${number} has been shipped.` },
+  delivered: { title: "Your order has been delivered", body: (number) => `Order #${number} has been delivered. Enjoy!` },
+};
+
+type OrderStatusPush = { userId: string; orderId: string; status: OrderStatus };
+
+export async function sendOrderStatusPush({ userId, orderId, status }: OrderStatusPush) {
+  const template = STATUS_MESSAGES[status];
+  if (!template) return;
+  await sendUserPush({
+    userId,
+    title: template.title,
+    body: template.body(orderNumber(orderId)),
+    data: { type: "order", orderId },
+  });
+}
+
 export function notifyOrderStatus(push: OrderStatusPush) {
   sendOrderStatusPush(push).catch((err) => {
     console.error(`Order ${push.orderId} push failed:`, err);

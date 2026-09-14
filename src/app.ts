@@ -17,6 +17,7 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 import deviceRoutes from "./routes/deviceRoutes";
 import appConfigRoutes from "./routes/appConfigRoutes";
 import discoveryRoutes from "./routes/discoveryRoutes";
+import rewardsRoutes from "./routes/rewardsRoutes";
 
 const app = express();
 
@@ -59,6 +60,7 @@ app.use("/api/admin/dashboard", dashboardRoutes);
 app.use("/api/devices", deviceRoutes);
 app.use("/api/app", appConfigRoutes);
 app.use("/api", discoveryRoutes);
+app.use("/api", rewardsRoutes);
 
 app.use(notFound);
 Sentry.setupExpressErrorHandler(app);

@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/node";
 import mongoose from "mongoose";
 import app from "./app";
 import { env } from "./config/env";
+import { scheduleWalletJobs } from "./jobs/walletJobs";
 import Order from "./models/Order";
 
 // If existing duplicate orders block the unique paymentRef index, keep serving (order creation still
@@ -27,8 +28,12 @@ async function start() {
     console.log(`Server running on port ${env.PORT}`);
   });
 
+  // Expires wallet credit, settles checkout holds, sends expiry reminders and checks the ledger.
+  const walletJobs = scheduleWalletJobs();
+
   const shutdown = (signal: string) => {
     console.log(`${signal} received, shutting down`);
+    clearInterval(walletJobs);
     server.close(() => {
       mongoose.connection.close().finally(() => process.exit(0));
     });

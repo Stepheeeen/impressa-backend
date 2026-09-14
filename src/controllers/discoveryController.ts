@@ -5,13 +5,9 @@ import { isObjectId } from "../middleware/validate";
 import Banner, { BANNER_LINK_TYPES } from "../models/Banner";
 import PriceBand from "../models/PriceBand";
 import ProductTemplate from "../models/ProductTemplate";
+import { emptyToNull, optionalDate } from "../validation/fields";
 
 const HOME_PRODUCT_LIMIT = 10;
-
-// Admin forms send "" for an empty date or price.
-const emptyToNull = (value: unknown) => (value === "" || value === undefined ? null : value);
-
-const optionalDate = z.preprocess(emptyToNull, z.coerce.date({ error: "Enter a valid date." }).nullable());
 
 const BannerSchema = z
   .object({

@@ -6,6 +6,18 @@ import {
   getAllDesigns,
 } from "../controllers/adminController";
 import {
+  adjustWallet,
+  createCoupon,
+  deleteCoupon,
+  findCustomerWallet,
+  getAdminRewardSettings,
+  getReconciliation,
+  getRewardsSummary,
+  listCoupons,
+  updateCoupon,
+  updateRewardSettings,
+} from "../controllers/adminRewardsController";
+import {
   createBanner,
   createPriceBand,
   deleteBanner,
@@ -38,5 +50,18 @@ router.get("/price-bands", asyncHandler(listPriceBands));
 router.post("/price-bands", asyncHandler(createPriceBand));
 router.put("/price-bands/:id", validId, asyncHandler(updatePriceBand));
 router.delete("/price-bands/:id", validId, asyncHandler(deletePriceBand));
+
+router.get("/rewards/settings", asyncHandler(getAdminRewardSettings));
+router.put("/rewards/settings", asyncHandler(updateRewardSettings));
+router.get("/rewards/summary", asyncHandler(getRewardsSummary));
+
+router.get("/coupons", asyncHandler(listCoupons));
+router.post("/coupons", asyncHandler(createCoupon));
+router.put("/coupons/:id", validId, asyncHandler(updateCoupon));
+router.delete("/coupons/:id", validId, asyncHandler(deleteCoupon));
+
+router.get("/wallets", asyncHandler(findCustomerWallet));
+router.get("/wallets/reconciliation", asyncHandler(getReconciliation));
+router.post("/wallets/:userId/adjustments", validateObjectId("userId"), asyncHandler(adjustWallet));
 
 export default router;

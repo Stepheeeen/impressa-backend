@@ -26,6 +26,16 @@ export interface IOrder extends Document {
   instructions?: string;
   statusHistory?: { status: OrderStatus; at: Date }[];
   tracking?: { status?: TrackingStatus; code?: string; updatedAt?: Date };
+  pricing?: {
+    subtotalKobo: number;
+    deliveryFeeKobo: number;
+    discountKobo: number;
+    couponCode?: string;
+    walletAppliedKobo: number;
+    cardPaidKobo: number;
+  };
+  walletShortfallKobo?: number;
+  cashbackKobo?: number;
 }
 
 const OrderSchema = new Schema(
@@ -69,6 +79,26 @@ const OrderSchema = new Schema(
       code: { type: String },
       updatedAt: { type: Date },
     },
+
+    // How the order was paid (kobo), for orders from the checkout with coupons and wallet credit.
+    pricing: {
+      type: new Schema(
+        {
+          subtotalKobo: Number,
+          deliveryFeeKobo: Number,
+          discountKobo: Number,
+          couponCode: String,
+          walletAppliedKobo: Number,
+          cardPaidKobo: Number,
+        },
+        { _id: false }
+      ),
+      default: undefined,
+    },
+
+    // Wallet credit that was already gone when a late payment completed; needs manual follow-up.
+    walletShortfallKobo: { type: Number },
+    cashbackKobo: { type: Number },
   },
   { timestamps: true }
 );

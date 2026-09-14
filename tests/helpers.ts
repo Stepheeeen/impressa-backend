@@ -2,15 +2,17 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { MongoMemoryReplSet } from "mongodb-memory-server";
 import Order, { OrderStatus } from "../src/models/Order";
 import ProductTemplate from "../src/models/ProductTemplate";
+import RewardSettings from "../src/models/RewardSettings";
 import User from "../src/models/User";
 
-let mongo: MongoMemoryServer | undefined;
+let mongo: MongoMemoryReplSet | undefined;
 
+// A single-node replica set, because wallet operations use transactions (as on Atlas in production).
 export async function startDatabase() {
-  mongo = await MongoMemoryServer.create();
+  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
   await mongoose.connect(mongo.getUri());
   // Build unique indexes before tests rely on them.
   await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
@@ -57,14 +59,21 @@ export function createProduct(overrides: Record<string, unknown> = {}) {
   });
 }
 
-export function createOrder(userId: unknown, overrides: { status?: OrderStatus; totalAmount?: number } = {}) {
+export function setRewardSettings(values: Record<string, unknown>) {
+  return RewardSettings.updateOne({ key: "rewards" }, { $set: values }, { upsert: true, setDefaultsOnInsert: true });
+}
+
+export function createOrder(
+  userId: unknown,
+  overrides: { status?: OrderStatus; totalAmount?: number; paymentRef?: string } = {}
+) {
   return Order.create({
     user: userId,
     itemType: "Luxury Dress",
     quantity: 1,
     totalAmount: overrides.totalAmount ?? 10500,
     deliveryAddress: { address: "12 Admiralty Way, Lekki", state: "Lagos", country: "Nigeria", phone: "08012345678" },
-    paymentRef: `ref_${suffix()}`,
+    paymentRef: overrides.paymentRef ?? `ref_${suffix()}`,
     status: overrides.status ?? "paid",
     email: "buyer@example.com",
   });
