@@ -36,23 +36,33 @@ const populateItems = <T extends { populate: (...args: any[]) => T }>(query: T) 
     .populate({ path: "items.templateId", model: "ProductTemplate", select: "title imageUrls price sizes colors inStock" })
     .populate({ path: "items.designId", model: "Design", select: "title imageUrl" });
 
+// Members who helped pay for a shared cart see its order too.
+const visibleTo = (userId: unknown) => ({ $or: [{ user: userId }, { "payers.user": userId }] });
+
+// Only the person who placed an order can return or review its items, so the apps need to know whose it is.
+const markShared = (order: any, userId: unknown) => ({
+  ...order,
+  sharedWithYou: String(order.user?._id ?? order.user) !== String(userId),
+});
+
 // GET /api/orders/:id
 export const getOrder = async (req: Request, res: Response) => {
   const user = req.user!;
   const isAdmin = user.role === "admin";
-  const query = isAdmin ? { _id: req.params.id } : { _id: req.params.id, user: user._id };
+  const query = isAdmin ? { _id: req.params.id } : { _id: req.params.id, ...visibleTo(user._id) };
 
   const order = await populateItems(Order.findOne(query));
   if (!order) throw new HttpError(404, "Order not found");
 
   const [withParcels] = await withFulfilments([withItemNames(order)], isAdmin ? "admin" : "customer");
-  res.json(withParcels);
+  res.json(isAdmin ? withParcels : markShared(withParcels, user._id));
 };
 
 // GET /api/orders/user/me
 export const getAllOrdersForUser = async (req: Request, res: Response) => {
-  const orders = await populateItems(Order.find({ user: req.user!._id }).sort({ createdAt: -1 }));
-  res.json(await withFulfilments(orders.map(withItemNames), "customer"));
+  const orders = await populateItems(Order.find(visibleTo(req.user!._id)).sort({ createdAt: -1 }));
+  const withParcels = await withFulfilments(orders.map(withItemNames), "customer");
+  res.json(withParcels.map((order) => markShared(order, req.user!._id)));
 };
 
 // GET /api/orders (admins only)

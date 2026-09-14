@@ -1,5 +1,8 @@
 import Cart from "../models/Cart";
+import Design from "../models/Design";
+import GroupBuy from "../models/GroupBuy";
 import Merchant from "../models/Merchant";
+import ProductTemplate from "../models/ProductTemplate";
 
 // Money is handled in kobo (integers) and converted to naira only at the edges.
 export const DELIVERY_FEE_KOBO = 150_000; // ₦1,500 delivery for products Impressa sells itself
@@ -52,19 +55,52 @@ export type PricedCart = {
   hasUnavailable: boolean;
 };
 
-// Prices every line from the product's current price and stock. Prices stored on the cart or sent by clients are never used.
-export async function priceCart(userId: string): Promise<PricedCart> {
-  const cart = await Cart.findOne({ user: userId })
-    .populate({
-      path: "items.templateId",
-      model: "ProductTemplate",
-      select: "title imageUrls price sizes inStock itemType merchant stockQuantity hidden sellerActive",
-    })
-    .populate({ path: "items.designId", model: "Design", select: "title imageUrl" })
-    .populate({ path: "items.groupBuy", model: "GroupBuy", select: "code status expiresAt" })
-    .lean();
+export type CartItemInput = {
+  // Every stored cart item has one; the personal cart's type just doesn't declare it.
+  _id?: unknown;
+  templateId?: unknown;
+  designId?: unknown;
+  groupBuy?: unknown;
+  itemType?: string;
+  size?: string | null;
+  color?: string | null;
+  description?: string | null;
+  quantity?: number;
+};
 
-  const items: any[] = cart?.items ?? [];
+export async function priceCart(userId: string): Promise<PricedCart> {
+  const cart = await Cart.findOne({ user: userId }).lean();
+  return priceItems(cart?.items ?? []);
+}
+
+// Prices every line from the product's current price and stock. Prices stored on carts or sent by clients are never used.
+// Works for a personal cart or a shared one.
+export async function priceItems(cartItems: CartItemInput[]): Promise<PricedCart> {
+  const idsOf = (field: "templateId" | "designId" | "groupBuy") => [
+    ...new Set(cartItems.map((item) => item[field]).filter(Boolean).map(String)),
+  ];
+  const [products, designs, groups] = await Promise.all([
+    ProductTemplate.find({ _id: { $in: idsOf("templateId") } })
+      .select("title imageUrls price sizes inStock itemType merchant stockQuantity hidden sellerActive")
+      .lean(),
+    Design.find({ _id: { $in: idsOf("designId") } }).select("title imageUrl").lean(),
+    GroupBuy.find({ _id: { $in: idsOf("groupBuy") } }).select("code status expiresAt").lean(),
+  ]);
+  const byId = <T extends { _id: unknown }>(docs: T[]) => new Map(docs.map((doc) => [String(doc._id), doc]));
+  const [productsById, designsById, groupsById] = [byId(products), byId(designs), byId(groups)];
+
+  // Read fields one by one: shared cart items are Mongoose subdocuments, which can't be spread.
+  const items: any[] = cartItems.map((item) => ({
+    _id: item._id,
+    itemType: item.itemType,
+    size: item.size,
+    color: item.color,
+    description: item.description,
+    quantity: item.quantity,
+    templateId: item.templateId ? productsById.get(String(item.templateId)) ?? null : null,
+    designId: item.designId ? designsById.get(String(item.designId)) ?? null : null,
+    groupBuy: item.groupBuy ? groupsById.get(String(item.groupBuy)) ?? null : null,
+  }));
   const merchantIds = [
     ...new Set(items.map((item) => item.templateId?.merchant).filter(Boolean).map(String)),
   ];

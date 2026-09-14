@@ -33,7 +33,12 @@ async function affordableRewardKobo(amountKobo: number, settings: IRewardSetting
 }
 
 async function hasPaidOrder(userId: string) {
-  return Boolean(await Order.exists({ user: userId, status: { $in: ["paid", "shipped", "delivered"] } }));
+  return Boolean(
+    await Order.exists({
+      $or: [{ user: userId }, { "payers.user": userId }],
+      status: { $in: ["paid", "shipped", "delivered"] },
+    })
+  );
 }
 
 async function ensureEligible(userId: string, settings: IRewardSettings) {
@@ -175,28 +180,35 @@ export async function awardCashback(orderId: string) {
   // Orders from before the wallet checkout don't record their card payment, so they don't earn cashback.
   if (!order?.pricing || order.status !== "delivered" || !settings.cashbackEnabled) return 0;
 
-  const amountKobo = Math.min(
-    Math.floor((order.pricing.cardPaidKobo * settings.cashbackPercent) / 100),
-    settings.cashbackMaxKobo
-  );
-  if (amountKobo <= 0) return 0;
+  // On a shared cart order, each member earns cashback on what their own card paid.
+  const earners = order.payers?.length
+    ? order.payers.map((payer) => ({ userId: String(payer.user), cardKobo: payer.cardPaidKobo, key: `cashback:${order._id}:${payer.user}` }))
+    : [{ userId: String(order.user), cardKobo: order.pricing.cardPaidKobo, key: `cashback:${order._id}` }];
 
-  const credited = await creditWallet({
-    userId: String(order.user),
-    amountKobo,
-    source: "cashback",
-    expiryDays: settings.creditExpiryDays,
-    idempotencyKey: `cashback:${order._id}`,
-    reference: String(order._id),
-  });
-  if (!credited) return 0;
+  let totalKobo = 0;
+  for (const earner of earners) {
+    const amountKobo = Math.min(Math.floor((earner.cardKobo * settings.cashbackPercent) / 100), settings.cashbackMaxKobo);
+    if (amountKobo <= 0) continue;
 
-  await Order.updateOne({ _id: order._id }, { $set: { cashbackKobo: amountKobo } });
-  notifyUser({
-    userId: String(order.user),
-    title: "You earned cashback",
-    body: `${formatNaira(amountKobo)} cashback from order #${orderNumber(String(order._id))} is in your wallet.`,
-    data: { type: "wallet" },
-  });
-  return amountKobo;
+    const credited = await creditWallet({
+      userId: earner.userId,
+      amountKobo,
+      source: "cashback",
+      expiryDays: settings.creditExpiryDays,
+      idempotencyKey: earner.key,
+      reference: String(order._id),
+    });
+    if (!credited) continue;
+
+    totalKobo += amountKobo;
+    notifyUser({
+      userId: earner.userId,
+      title: "You earned cashback",
+      body: `${formatNaira(amountKobo)} cashback from order #${orderNumber(String(order._id))} is in your wallet.`,
+      data: { type: "wallet" },
+    });
+  }
+
+  if (totalKobo > 0) await Order.updateOne({ _id: order._id }, { $inc: { cashbackKobo: totalKobo } });
+  return totalKobo;
 }

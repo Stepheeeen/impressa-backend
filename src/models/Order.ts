@@ -37,6 +37,15 @@ export interface IOrder extends Document {
   walletShortfallKobo?: number;
   cashbackKobo?: number;
   cardRefundedKobo?: number;
+  // Shared cart orders paid by several members. Refunds and cashback are split between the payers.
+  sharedCart?: mongoose.Types.ObjectId | null;
+  payers?: {
+    user: mongoose.Types.ObjectId;
+    reference: string;
+    cardPaidKobo: number;
+    walletAppliedKobo: number;
+    cardRefundedKobo: number;
+  }[];
 }
 
 const OrderSchema = new Schema(
@@ -102,8 +111,26 @@ const OrderSchema = new Schema(
     cashbackKobo: { type: Number },
     // Refunded to the card so far, so refunds never exceed what the card paid.
     cardRefundedKobo: { type: Number, default: 0 },
+
+    sharedCart: { type: Schema.Types.ObjectId, ref: "SharedCart", default: null },
+    // Each member's Paystack payment for their share, so refunds go back to the right card.
+    payers: {
+      type: [
+        {
+          _id: false,
+          user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+          reference: { type: String, required: true },
+          cardPaidKobo: { type: Number, default: 0 },
+          walletAppliedKobo: { type: Number, default: 0 },
+          cardRefundedKobo: { type: Number, default: 0 },
+        },
+      ],
+      default: undefined,
+    },
   },
   { timestamps: true }
 );
+
+OrderSchema.index({ "payers.user": 1 }, { sparse: true });
 
 export default mongoose.model<IOrder>("Order", OrderSchema);

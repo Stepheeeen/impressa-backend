@@ -3,8 +3,9 @@ import Order, { IOrder } from "../models/Order";
 import { redeemCoupon } from "./coupons";
 import { createFulfilmentsForOrder } from "./fulfilments";
 import { recordGroupBuyPurchases } from "./groupBuys";
+import type { ISharedCheckout } from "../models/SharedCheckout";
 import type { PaystackTransaction } from "./paystack";
-import { toKobo } from "./pricing";
+import { toKobo, toNaira } from "./pricing";
 import { commitHold, InsufficientCreditError, spendFromWallet } from "./wallet";
 
 export class PaymentMismatchError extends Error {
@@ -57,16 +58,46 @@ export function createOrderFromWallet(input: { reference: string; email: string;
   return createOrder({ ...input, cardPaidKobo: 0 });
 }
 
+// The order for a shared cart once every member has paid their share. Safe to call more than once.
+export function createOrderFromSharedCheckout(checkout: ISharedCheckout, email?: string) {
+  const paid = checkout.shares.filter((share) => share.status === "paid");
+  const cardPaidKobo = paid.reduce((sum, share) => sum + share.cardKobo, 0);
+  const walletKobo = paid.reduce((sum, share) => sum + share.walletKobo, 0);
+  return createOrder({
+    reference: `shared_${checkout._id}`,
+    email,
+    metadata: {
+      ...checkout.metadata,
+      userId: String(checkout.owner),
+      walletApplied: toNaira(walletKobo),
+      totalAmount: toNaira(cardPaidKobo),
+    },
+    cardPaidKobo,
+    shared: {
+      sharedCartId: String(checkout.sharedCart),
+      payers: paid.map((share) => ({
+        user: share.user,
+        reference: share.reference!,
+        cardPaidKobo: share.cardKobo,
+        walletAppliedKobo: share.walletKobo,
+        cardRefundedKobo: 0,
+      })),
+    },
+  });
+}
+
 async function createOrder({
   reference,
   email,
   metadata,
   cardPaidKobo,
+  shared,
 }: {
   reference: string;
   email?: string;
   metadata: Record<string, any>;
   cardPaidKobo: number;
+  shared?: { sharedCartId: string; payers: NonNullable<IOrder["payers"]> };
 }) {
   const cart: any[] = metadata.cart;
   // Checkouts from before coupons and wallet credit only know the card amount.
@@ -93,6 +124,7 @@ async function createOrder({
         items: cart,
         itemNames: cart.map((item, index) => item.title || item.name || `item-${index + 1}`),
         instructions: "Delivery will take 3–7 days. Ensure your WhatsApp and email are active.",
+        ...(shared ? { sharedCart: shared.sharedCartId, payers: shared.payers } : {}),
         ...(hasPricing
           ? {
               pricing: {
@@ -124,7 +156,8 @@ async function createOrder({
 async function settleOrderPayment(order: IOrder) {
   const walletAppliedKobo = order.pricing?.walletAppliedKobo ?? 0;
 
-  if (walletAppliedKobo > 0 && (await commitHold(order.paymentRef)) !== "committed") {
+  // Shared cart payers' wallet credit was settled as each of them paid.
+  if (walletAppliedKobo > 0 && !order.payers?.length && (await commitHold(order.paymentRef)) !== "committed") {
     // The hold timed out before payment finished, so take the credit now if the customer still has it.
     try {
       await spendFromWallet({

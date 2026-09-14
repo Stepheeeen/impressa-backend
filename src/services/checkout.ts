@@ -4,6 +4,7 @@ import { AppliedCoupon, applyCoupon } from "./coupons";
 import { PricedCart, priceCart, toNaira } from "./pricing";
 import { getRewardSettings } from "./rewardSettings";
 import { getAvailableCreditKobo } from "./wallet";
+import type { Delivery } from "../validation/delivery";
 
 // Paystack won't charge tiny amounts, so a card payment is never less than ₦100.
 export const MIN_CARD_CHARGE_KOBO = 10_000;
@@ -21,7 +22,8 @@ export type CheckoutQuote = {
   cardKobo: number;
 };
 
-function walletLimitKobo(settings: IRewardSettings, itemsKobo: number, totalKobo: number) {
+// How much wallet credit may pay for an order, under the admin's wallet usage setting.
+export function walletLimitKobo(settings: IRewardSettings, itemsKobo: number, totalKobo: number) {
   switch (settings.walletUsageMode) {
     case "items-only":
       return itemsKobo;
@@ -83,6 +85,44 @@ export async function quoteCheckout({
     walletAppliedKobo,
     totalKobo,
     cardKobo: totalKobo - walletAppliedKobo,
+  };
+}
+
+// Everything the order is built from once payment succeeds. totalAmount is what the card is charged.
+export function buildOrderMetadata(userId: string, quote: CheckoutQuote, delivery: Delivery) {
+  const { lines, itemCount, sellers } = quote.priced;
+  return {
+    userId,
+    cart: lines.map((line) => ({
+      templateId: line.templateId,
+      merchantId: line.merchantId,
+      title: line.title,
+      quantity: line.quantity,
+      unitPrice: toNaira(line.unitPriceKobo),
+      itemTotal: toNaira(line.unitPriceKobo * line.quantity),
+      imageUrl: line.imageUrl,
+      options: { size: line.size, color: line.color },
+      groupBuyId: line.groupBuy?.id ?? null,
+    })),
+    phone: delivery.phone,
+    country: "Nigeria",
+    state: delivery.state,
+    address: delivery.address,
+    itemType: lines[0].title,
+    quantity: itemCount,
+    subtotal: toNaira(quote.subtotalKobo),
+    deliveryFee: toNaira(quote.deliveryFeeKobo),
+    discount: toNaira(quote.discountKobo),
+    couponCode: quote.coupon?.code ?? null,
+    walletApplied: toNaira(quote.walletAppliedKobo),
+    orderTotal: toNaira(quote.totalKobo),
+    totalAmount: toNaira(quote.cardKobo),
+    // Each seller becomes a fulfilment with its own delivery fee once payment succeeds.
+    sellers: sellers.map((seller) => ({
+      merchantId: seller.merchantId,
+      name: seller.name,
+      deliveryFee: toNaira(seller.deliveryFeeKobo),
+    })),
   };
 }
 

@@ -3,15 +3,9 @@ import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler";
 import Cart from "../models/Cart";
 import GroupBuy from "../models/GroupBuy";
-import Merchant from "../models/Merchant";
-import ProductTemplate, { IProductTemplate } from "../models/ProductTemplate";
+import ProductTemplate from "../models/ProductTemplate";
+import { ensureStock, findBuyableProduct, quantityField } from "../services/cartItems";
 import { MAX_ITEM_QUANTITY, priceCart, toCartResponse } from "../services/pricing";
-
-const quantityField = z.coerce
-  .number({ error: "Quantity must be a number." })
-  .int("Quantity must be a whole number.")
-  .min(1, "Quantity must be at least 1.")
-  .max(MAX_ITEM_QUANTITY, `You can add up to ${MAX_ITEM_QUANTITY} of an item.`);
 
 // Any price, itemType or designId sent by the client is stripped here.
 const AddToCartSchema = z.object({
@@ -23,24 +17,6 @@ const AddToCartSchema = z.object({
   // Buying through a group buy someone shared.
   groupBuyCode: z.string().trim().max(20).nullish(),
 });
-
-// Hidden products, suspended sellers and unapproved merchants can't be bought.
-async function ensureListed(product: Pick<IProductTemplate, "hidden" | "sellerActive" | "merchant"> | null) {
-  const unavailable = new HttpError(404, "This product is no longer available.");
-  if (!product || product.hidden || product.sellerActive === false) throw unavailable;
-  if (product.merchant) {
-    const merchant = await Merchant.findById(product.merchant).select("status").lean();
-    if (merchant?.status !== "approved") throw unavailable;
-  }
-}
-
-function ensureStock(product: Pick<IProductTemplate, "stockQuantity">, quantity: number) {
-  if (typeof product.stockQuantity !== "number" || product.stockQuantity >= quantity) return;
-  throw new HttpError(
-    400,
-    product.stockQuantity === 0 ? "This product is out of stock." : `Only ${product.stockQuantity} left in stock.`
-  );
-}
 
 const UpdateQuantitySchema = z.object({
   id: z.string({ error: "Item not found in cart." }).regex(/^[a-f0-9]{24}$/i, "Item not found in cart."),
@@ -55,17 +31,7 @@ export const addToCart = async (req: Request, res: Response) => {
   const size = input.size || undefined;
   const color = input.color || undefined;
 
-  const product = await ProductTemplate.findById(input.templateId).lean();
-  await ensureListed(product);
-  if (!product) return;
-  if (product.inStock === false) throw new HttpError(400, "This product is out of stock.");
-  if (!(Number(product.price) > 0)) throw new HttpError(400, "This product isn't available to buy yet.");
-  if (size && product.sizes?.length && !product.sizes.includes(size)) {
-    throw new HttpError(400, "That size isn't available for this product.");
-  }
-  if (color && product.colors?.length && !product.colors.includes(color)) {
-    throw new HttpError(400, "That colour isn't available for this product.");
-  }
+  const product = await findBuyableProduct({ templateId: input.templateId, size, color });
 
   let group = null;
   if (input.groupBuyCode) {

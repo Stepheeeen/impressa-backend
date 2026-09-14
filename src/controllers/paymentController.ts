@@ -1,71 +1,20 @@
 import crypto from "crypto";
 import { Request, Response } from "express";
 import { z } from "zod";
-import { NIGERIA_STATES } from "../constants/nigeria";
 import { HttpError } from "../middleware/errorHandler";
-import { CheckoutQuote, quoteCheckout, toQuoteResponse } from "../services/checkout";
+import { buildOrderMetadata, quoteCheckout, toQuoteResponse } from "../services/checkout";
 import { createOrderFromWallet } from "../services/orders";
 import { initializeTransaction } from "../services/paystack";
 import { toNaira } from "../services/pricing";
 import { holdWalletCredit, InsufficientCreditError, releaseHold } from "../services/wallet";
+import { DeliverySchema } from "../validation/delivery";
 
 const RewardOptionsSchema = z.object({
   couponCode: z.string().trim().max(40).optional(),
   useWallet: z.boolean().optional().default(false),
 });
 
-const CheckoutSchema = RewardOptionsSchema.extend({
-  state: z.enum(NIGERIA_STATES, { error: "Choose a delivery state." }),
-  address: z
-    .string({ error: "Enter a delivery address." })
-    .trim()
-    .min(5, "Enter your full delivery address.")
-    .max(300, "Delivery address is too long."),
-  phone: z
-    .string({ error: "Enter a phone number." })
-    .trim()
-    .regex(/^\+?[0-9][0-9\s-]{9,15}$/, "Enter a valid phone number."),
-});
-
-type Delivery = Pick<z.infer<typeof CheckoutSchema>, "state" | "address" | "phone">;
-
-// Everything the order is built from once payment succeeds. totalAmount is what the card is charged.
-function orderMetadata(userId: string, quote: CheckoutQuote, delivery: Delivery) {
-  const { lines, itemCount, sellers } = quote.priced;
-  return {
-    userId,
-    cart: lines.map((line) => ({
-      templateId: line.templateId,
-      merchantId: line.merchantId,
-      title: line.title,
-      quantity: line.quantity,
-      unitPrice: toNaira(line.unitPriceKobo),
-      itemTotal: toNaira(line.unitPriceKobo * line.quantity),
-      imageUrl: line.imageUrl,
-      options: { size: line.size, color: line.color },
-      groupBuyId: line.groupBuy?.id ?? null,
-    })),
-    phone: delivery.phone,
-    country: "Nigeria",
-    state: delivery.state,
-    address: delivery.address,
-    itemType: lines[0].title,
-    quantity: itemCount,
-    subtotal: toNaira(quote.subtotalKobo),
-    deliveryFee: toNaira(quote.deliveryFeeKobo),
-    discount: toNaira(quote.discountKobo),
-    couponCode: quote.coupon?.code ?? null,
-    walletApplied: toNaira(quote.walletAppliedKobo),
-    orderTotal: toNaira(quote.totalKobo),
-    totalAmount: toNaira(quote.cardKobo),
-    // Each seller becomes a fulfilment with its own delivery fee once payment succeeds.
-    sellers: sellers.map((seller) => ({
-      merchantId: seller.merchantId,
-      name: seller.name,
-      deliveryFee: toNaira(seller.deliveryFeeKobo),
-    })),
-  };
-}
+const CheckoutSchema = RewardOptionsSchema.extend(DeliverySchema.shape);
 
 // POST /api/pay/quote — shows the coupon discount, wallet credit and card amount before paying.
 export const getCheckoutQuote = async (req: Request, res: Response) => {
@@ -87,7 +36,7 @@ export const initializePayment = async (req: Request, res: Response) => {
   if (quote.couponError) throw new HttpError(400, quote.couponError);
 
   const reference = `imp_${crypto.randomBytes(12).toString("hex")}`;
-  const metadata = orderMetadata(user.id, quote, delivery);
+  const metadata = buildOrderMetadata(user.id, quote, delivery);
 
   if (quote.walletAppliedKobo > 0) {
     try {

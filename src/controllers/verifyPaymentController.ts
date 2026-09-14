@@ -5,6 +5,7 @@ import { HttpError } from "../middleware/errorHandler";
 import { createOrderFromPayment, parseMetadata, PaymentMismatchError } from "../services/orders";
 import { applyTransferStatus } from "../services/payouts";
 import { verifyTransaction } from "../services/paystack";
+import { applySharedCartPayment, SHARED_CART_PAYMENT } from "../services/sharedCarts";
 
 const REFERENCE = /^[A-Za-z0-9._=-]{1,100}$/;
 
@@ -19,11 +20,25 @@ export const verifyPayment = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Payment not successful", gateway_response: tx?.gateway_response });
   }
 
-  if (String(parseMetadata(tx.metadata).userId) !== String(req.user!.id)) {
+  const metadata = parseMetadata(tx.metadata);
+  if (String(metadata.userId) !== String(req.user!.id)) {
     throw new HttpError(404, "Payment not found.");
   }
 
   try {
+    if (metadata.kind === SHARED_CART_PAYMENT) {
+      const checkout = await applySharedCartPayment({ reference: tx.reference, amountKobo: tx.amount, currency: tx.currency });
+      const refunded = checkout.payments.find((payment) => payment.reference === tx.reference)?.status === "refunded";
+      return res.json({
+        status: "success",
+        message: refunded ? "This payment wasn't needed, so it's being refunded." : "Payment verified",
+        sharedCartId: String(checkout.sharedCart),
+        orderId: checkout.order ?? null,
+        refunded,
+        reference: tx.reference,
+      });
+    }
+
     const order = await createOrderFromPayment(tx);
     return res.json({ status: "success", message: "Payment verified", orderId: order._id, reference: tx.reference });
   } catch (err) {
@@ -60,6 +75,15 @@ export const paystackWebhook = async (req: Request, res: Response) => {
   }
 
   try {
+    if (parseMetadata(event.data.metadata).kind === SHARED_CART_PAYMENT) {
+      await applySharedCartPayment({
+        reference: String(event.data.reference),
+        amountKobo: Number(event.data.amount),
+        currency: String(event.data.currency),
+      });
+      return res.json({ received: true });
+    }
+
     const order = await createOrderFromPayment(event.data);
     return res.json({ received: true, orderId: order._id });
   } catch (err) {
