@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/node";
 import Order, { IOrder } from "../models/Order";
 import { redeemCoupon } from "./coupons";
 import { createFulfilmentsForOrder } from "./fulfilments";
+import { recordGroupBuyPurchases } from "./groupBuys";
 import type { PaystackTransaction } from "./paystack";
 import { toKobo } from "./pricing";
 import { commitHold, InsufficientCreditError, spendFromWallet } from "./wallet";
@@ -115,6 +116,7 @@ async function createOrder({
 
   await settleOrderPayment(order);
   await createFulfilmentsForOrder(order, metadata);
+  await recordGroupBuyPurchases(order, metadata);
   return order;
 }
 

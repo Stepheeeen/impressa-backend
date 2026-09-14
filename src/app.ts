@@ -20,6 +20,7 @@ import discoveryRoutes from "./routes/discoveryRoutes";
 import rewardsRoutes from "./routes/rewardsRoutes";
 import merchantRoutes from "./routes/merchantRoutes";
 import marketplaceRoutes from "./routes/marketplaceRoutes";
+import groupBuyRoutes from "./routes/groupBuyRoutes";
 
 const app = express();
 
@@ -65,6 +66,7 @@ app.use("/api", discoveryRoutes);
 app.use("/api", rewardsRoutes);
 app.use("/api", merchantRoutes);
 app.use("/api", marketplaceRoutes);
+app.use("/api", groupBuyRoutes);
 
 app.use(notFound);
 Sentry.setupExpressErrorHandler(app);

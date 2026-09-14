@@ -10,7 +10,7 @@ export const toKobo = (naira: number) => Math.round(naira * 100);
 export const toNaira = (kobo: number) => kobo / 100;
 export const formatNaira = (kobo: number) => `₦${toNaira(kobo).toLocaleString("en-NG")}`;
 
-export type UnavailableReason = "out-of-stock" | "not-enough-stock" | "unavailable";
+export type UnavailableReason = "out-of-stock" | "not-enough-stock" | "unavailable" | "group-ended";
 
 export type PricedLine = {
   id: string;
@@ -30,6 +30,8 @@ export type PricedLine = {
   unitPriceKobo: number;
   available: boolean;
   unavailableReason: UnavailableReason | null;
+  // Set when the item is being bought through a group buy.
+  groupBuy: { id: string; code: string; endsAt: Date } | null;
 };
 
 // Each seller ships their own parcel and charges their own delivery fee.
@@ -59,6 +61,7 @@ export async function priceCart(userId: string): Promise<PricedCart> {
       select: "title imageUrls price sizes inStock itemType merchant stockQuantity hidden sellerActive",
     })
     .populate({ path: "items.designId", model: "Design", select: "title imageUrl" })
+    .populate({ path: "items.groupBuy", model: "GroupBuy", select: "code status expiresAt" })
     .lean();
 
   const items: any[] = cart?.items ?? [];
@@ -88,8 +91,12 @@ export async function priceCart(userId: string): Promise<PricedCart> {
       product.sellerActive !== false &&
       (!merchantId || merchant?.status === "approved");
 
+    const group = item.groupBuy && typeof item.groupBuy === "object" ? item.groupBuy : null;
+    const groupEnded = Boolean(group) && (group.status !== "open" || new Date(group.expiresAt) <= new Date());
+
     let unavailableReason: UnavailableReason | null = null;
     if (!listed) unavailableReason = "unavailable";
+    else if (groupEnded) unavailableReason = "group-ended";
     else if (product.inStock === false || stock === 0) unavailableReason = "out-of-stock";
     else if (stock !== null && stock < quantity) unavailableReason = "not-enough-stock";
 
@@ -110,6 +117,7 @@ export async function priceCart(userId: string): Promise<PricedCart> {
       unitPriceKobo: unavailableReason === null ? toKobo(price) : 0,
       available: unavailableReason === null,
       unavailableReason,
+      groupBuy: group ? { id: String(group._id), code: group.code, endsAt: group.expiresAt } : null,
     };
   });
 
@@ -157,6 +165,7 @@ export function toCartResponse(priced: PricedCart) {
       itemTotal: toNaira(line.unitPriceKobo * line.quantity),
       color: line.color,
       description: line.description,
+      groupBuy: line.groupBuy ? { code: line.groupBuy.code, endsAt: line.groupBuy.endsAt } : null,
     })),
     sellers: priced.sellers.map((seller) => ({
       merchantId: seller.merchantId,

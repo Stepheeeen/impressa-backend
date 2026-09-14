@@ -20,6 +20,11 @@ export interface IProductTemplate extends Document {
   sellerActive?: boolean;
   ratingAverage?: number;
   ratingCount?: number;
+  groupBuy?: {
+    enabled: boolean;
+    durationHours: number;
+    tiers: { minQuantity: number; price: number }[];
+  } | null;
 }
 
 const ProductTemplateSchema: Schema = new Schema(
@@ -52,6 +57,18 @@ const ProductTemplateSchema: Schema = new Schema(
     sellerActive: { type: Boolean, default: true },
     ratingAverage: { type: Number, default: 0 },
     ratingCount: { type: Number, default: 0 },
+    // Lower prices the merchant offers when shoppers buy together, smallest quantity first. Prices are naira, like price.
+    groupBuy: {
+      type: new Schema(
+        {
+          enabled: { type: Boolean, default: false },
+          durationHours: { type: Number, min: 1, max: 168, default: 72 },
+          tiers: { type: [{ _id: false, minQuantity: Number, price: Number }], default: [] },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
   },
   { timestamps: true }
 );

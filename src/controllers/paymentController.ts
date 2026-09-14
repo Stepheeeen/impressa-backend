@@ -43,6 +43,7 @@ function orderMetadata(userId: string, quote: CheckoutQuote, delivery: Delivery)
       itemTotal: toNaira(line.unitPriceKobo * line.quantity),
       imageUrl: line.imageUrl,
       options: { size: line.size, color: line.color },
+      groupBuyId: line.groupBuy?.id ?? null,
     })),
     phone: delivery.phone,
     country: "Nigeria",

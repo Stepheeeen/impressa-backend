@@ -11,6 +11,7 @@ export interface ICart extends Document {
     price: number;
     color?: string;
     description?: string;
+    groupBuy?: mongoose.Types.ObjectId;
   }[];
 }
 
@@ -27,6 +28,8 @@ const CartSchema = new Schema(
         price: Number,
         color: String,
         description: String,
+        // Bought through this group buy.
+        groupBuy: { type: Schema.Types.ObjectId, ref: "GroupBuy" },
       },
     ],
   },

@@ -95,13 +95,24 @@ export async function requestReturn(input: ReturnInput) {
   return request;
 }
 
+// Group buy savings already credited on these units. A refund mustn't pay them out a second time.
+function groupSavingsKobo(
+  fulfilment: { items: { groupSavingsPerUnitKobo?: number }[] } | null,
+  items: { index: number; quantity: number }[]
+) {
+  if (!fulfilment) return 0;
+  return items.reduce((sum, item) => sum + (fulfilment.items[item.index]?.groupSavingsPerUnitKobo ?? 0) * item.quantity, 0);
+}
+
 // Takes refunded items out of the merchant's payout. The delivery fee stays with the merchant.
 async function applyReturnToFulfilment(request: IReturnRequest) {
   const fulfilment = await Fulfilment.findById(request.fulfilment);
   if (!fulfilment) return;
 
   const refundedItemsKobo = (fulfilment.refundedItemsKobo ?? 0) + request.itemsValueKobo;
-  const keptItemsKobo = Math.max(0, fulfilment.itemsSubtotalKobo - refundedItemsKobo);
+  // The returned units' group discount no longer applies either.
+  const groupDiscountKobo = Math.max(0, (fulfilment.groupDiscountKobo ?? 0) - groupSavingsKobo(fulfilment, request.items));
+  const keptItemsKobo = Math.max(0, fulfilment.itemsSubtotalKobo - refundedItemsKobo - groupDiscountKobo);
   const commissionKobo = Math.floor((keptItemsKobo * fulfilment.commissionPercent) / 100);
 
   await Fulfilment.updateOne(
@@ -110,6 +121,7 @@ async function applyReturnToFulfilment(request: IReturnRequest) {
       $inc: Object.fromEntries(request.items.map((item) => [`items.${item.index}.returnedQuantity`, item.quantity])),
       $set: {
         refundedItemsKobo,
+        groupDiscountKobo,
         commissionKobo,
         payoutKobo: fulfilment.merchant ? keptItemsKobo - commissionKobo + fulfilment.deliveryFeeKobo : 0,
       },
@@ -126,8 +138,11 @@ async function approve(returnId: string, from: ReturnStatus[], decision: Record<
   );
   if (!before) return null;
 
-  const order = await Order.findById(before.order).lean();
-  const refundKobo = paidItemsValueKobo(order, before.itemsValueKobo);
+  const [order, fulfilment] = await Promise.all([
+    Order.findById(before.order).lean(),
+    Fulfilment.findById(before.fulfilment).lean(),
+  ]);
+  const refundKobo = paidItemsValueKobo(order, before.itemsValueKobo - groupSavingsKobo(fulfilment, before.items));
 
   let refund;
   try {

@@ -113,6 +113,8 @@ export async function createDuePayouts(now = new Date()) {
     status: "delivered",
     deliveredAt: { $lte: daysFromNow(-settings.returnWindowDays, now) },
     "payout.status": "pending",
+    // The payout changes once a group buy closes, so wait for it.
+    groupBuyPending: { $ne: true },
   })
     .select("_id merchant payoutKobo")
     .lean();

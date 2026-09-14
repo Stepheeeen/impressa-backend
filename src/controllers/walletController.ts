@@ -12,6 +12,7 @@ const SOURCE_LABELS: Record<string, string> = {
   "scratch-card": "Scratch card prize",
   adjustment: "Adjustment by Impressa",
   refund: "Refund",
+  "group-buy": "Group buy savings",
   checkout: "Used at checkout",
   expiry: "Expired credit",
 };

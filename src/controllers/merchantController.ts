@@ -9,6 +9,7 @@ import ProductTemplate from "../models/ProductTemplate";
 import User from "../models/User";
 import { isIdDocumentPublicId, signIdDocumentUpload } from "../services/cloudinary";
 import { updateFulfilmentTracking } from "../services/fulfilments";
+import { groupPricesError, MAX_GROUP_BUY_HOURS, MAX_GROUP_PRICES } from "../services/groupBuys";
 import { getMarketplaceSettings } from "../services/marketplaceSettings";
 import { createTransferRecipient, listBanks, resolveBankAccount } from "../services/paystack";
 import { toKobo, toNaira } from "../services/pricing";
@@ -57,6 +58,30 @@ const ChangeBankSchema = BankAccountSchema.extend({
 const httpsUrl = (message: string) => z.string().trim().regex(/^https:\/\/\S+$/, message);
 const textList = z.array(z.string().trim().min(1).max(30)).max(20).default([]);
 
+const GroupPricesSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    durationHours: z.coerce
+      .number({ error: "Choose how long a group buy stays open." })
+      .int("Choose how long a group buy stays open.")
+      .min(1, "A group buy must stay open for at least an hour.")
+      .max(MAX_GROUP_BUY_HOURS, "A group buy can stay open for at most 7 days."),
+    tiers: z
+      .array(
+        z.object({
+          minQuantity: z.coerce
+            .number({ error: "Enter a quantity for each group price." })
+            .int("Group quantities must be whole numbers.")
+            .min(2, "A group price needs at least 2 units.")
+            .max(100_000),
+          price: z.coerce.number({ error: "Enter each group price." }).positive("Group prices must be above zero."),
+        })
+      )
+      .max(MAX_GROUP_PRICES, `Use at most ${MAX_GROUP_PRICES} group prices.`)
+      .default([]),
+  })
+  .nullish();
+
 const ProductSchema = z.object({
   title: z.string({ error: "Add a product name." }).trim().min(2, "Add a product name.").max(120),
   category: z.string({ error: "Choose a category." }).trim().toLowerCase().min(2, "Choose a category.").max(40),
@@ -76,9 +101,17 @@ const ProductSchema = z.object({
     .int("Stock must be a whole number.")
     .min(0, "Stock can't be negative.")
     .max(100_000),
+  groupBuy: GroupPricesSchema,
 });
 
 const StockSchema = z.object({ stockQuantity: ProductSchema.shape.stockQuantity });
+
+function parseProduct(body: unknown) {
+  const input = ProductSchema.parse(body ?? {});
+  const groupError = groupPricesError(input.price, input.groupBuy);
+  if (groupError) throw new HttpError(400, groupError);
+  return { ...input, groupBuy: input.groupBuy?.enabled ? input.groupBuy : null };
+}
 
 const FulfilmentListSchema = z.object({
   status: z.enum(["to-ship", "shipped", "delivered", "cancelled", "all"]).default("to-ship"),
@@ -231,7 +264,7 @@ export const listMyProducts = async (req: Request, res: Response) => {
 
 // POST /api/merchant/products — goes live straight away; admins can hide it.
 export const createMyProduct = async (req: Request, res: Response) => {
-  const input = ProductSchema.parse(req.body ?? {});
+  const input = parseProduct(req.body);
   const product = await ProductTemplate.create({
     ...input,
     merchant: req.merchant!._id,
@@ -246,7 +279,7 @@ export const createMyProduct = async (req: Request, res: Response) => {
 
 // PUT /api/merchant/products/:id
 export const updateMyProduct = async (req: Request, res: Response) => {
-  const input = ProductSchema.parse(req.body ?? {});
+  const input = parseProduct(req.body);
   const product = await ProductTemplate.findOneAndUpdate({ _id: req.params.id, merchant: req.merchant!._id }, input, {
     new: true,
   });

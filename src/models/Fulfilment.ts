@@ -18,6 +18,9 @@ export type FulfilmentItem = {
   // Another customer bought the last units before this payment completed.
   oversold?: boolean;
   returnedQuantity?: number;
+  groupBuy?: mongoose.Types.ObjectId | null;
+  // Credited back to the buyer per unit when the group buy closed at a lower price.
+  groupSavingsPerUnitKobo?: number;
 };
 
 // One seller's part of an order: the parcel they ship, and what they're paid for it.
@@ -43,6 +46,10 @@ export interface IFulfilment extends Document {
   payout: { status: PayoutStatus; payoutId?: mongoose.Types.ObjectId | null; paidAt?: Date | null };
   // Value of items refunded through returns; they no longer count toward the payout.
   refundedItemsKobo: number;
+  // Group buy savings on units the customer kept; the merchant isn't paid for them.
+  groupDiscountKobo: number;
+  // True until the group buys these items were bought through have closed and settled. Payouts wait for it.
+  groupBuyPending: boolean;
   cancelledAt?: Date | null;
   cancelReason?: string;
 }
@@ -66,6 +73,8 @@ const FulfilmentSchema = new Schema(
           imageUrl: String,
           oversold: Boolean,
           returnedQuantity: { type: Number, default: 0 },
+          groupBuy: { type: Schema.Types.ObjectId, ref: "GroupBuy", default: null },
+          groupSavingsPerUnitKobo: { type: Number, default: 0 },
         },
       ],
       default: [],
@@ -94,6 +103,8 @@ const FulfilmentSchema = new Schema(
       paidAt: { type: Date, default: null },
     },
     refundedItemsKobo: { type: Number, default: 0 },
+    groupDiscountKobo: { type: Number, default: 0 },
+    groupBuyPending: { type: Boolean, default: false },
     cancelledAt: { type: Date, default: null },
     cancelReason: { type: String, default: "" },
   },
@@ -104,5 +115,6 @@ const FulfilmentSchema = new Schema(
 FulfilmentSchema.index({ order: 1, merchant: 1 }, { unique: true });
 FulfilmentSchema.index({ merchant: 1, status: 1, createdAt: -1 });
 FulfilmentSchema.index({ "payout.status": 1, deliveredAt: 1 });
+FulfilmentSchema.index({ "items.groupBuy": 1 }, { sparse: true });
 
 export default mongoose.model<IFulfilment>("Fulfilment", FulfilmentSchema);

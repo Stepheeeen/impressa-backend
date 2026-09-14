@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export const CREDIT_SOURCES = ["cashback", "check-in", "scratch-card", "adjustment", "refund"] as const;
+export const CREDIT_SOURCES = ["cashback", "check-in", "scratch-card", "adjustment", "refund", "group-buy"] as const;
 export type CreditSource = (typeof CREDIT_SOURCES)[number];
 
 // One credit added to a wallet. Spending draws down the lots that expire soonest.

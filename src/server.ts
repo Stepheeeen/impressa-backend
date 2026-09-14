@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import app from "./app";
 import { env } from "./config/env";
 import { scheduleMarketplaceJobs } from "./jobs/marketplaceJobs";
+import { scheduleSocialJobs } from "./jobs/socialJobs";
 import { scheduleWalletJobs } from "./jobs/walletJobs";
 import Order from "./models/Order";
 
@@ -33,11 +34,14 @@ async function start() {
   const walletJobs = scheduleWalletJobs();
   // Escalates and closes returns, and pays merchants once their returns window has passed.
   const marketplaceJobs = scheduleMarketplaceJobs();
+  // Closes group buys after their deadline and credits the savings.
+  const socialJobs = scheduleSocialJobs();
 
   const shutdown = (signal: string) => {
     console.log(`${signal} received, shutting down`);
     clearInterval(walletJobs);
     clearInterval(marketplaceJobs);
+    clearInterval(socialJobs);
     server.close(() => {
       mongoose.connection.close().finally(() => process.exit(0));
     });

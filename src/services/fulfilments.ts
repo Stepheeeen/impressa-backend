@@ -221,7 +221,9 @@ export async function createFulfilmentsForOrder(order: IOrder, metadata: Record<
           size: line.options?.size ?? undefined,
           color: line.options?.color ?? undefined,
           imageUrl: line.imageUrl ?? undefined,
+          groupBuy: line.groupBuyId ?? null,
         })),
+        groupBuyPending: lines.some((line) => line.groupBuyId),
         itemsSubtotalKobo,
         deliveryFeeKobo,
         commissionPercent,
@@ -261,7 +263,9 @@ export async function cancelFulfilment(fulfilmentId: string, { reason, scope = {
   if (!fulfilment) return null;
 
   const order = await Order.findById(fulfilment.order).lean();
-  const refundKobo = paidItemsValueKobo(order, fulfilment.itemsSubtotalKobo) + fulfilment.deliveryFeeKobo;
+  // Group buy savings already credited to the wallet aren't refunded again.
+  const refundKobo =
+    paidItemsValueKobo(order, fulfilment.itemsSubtotalKobo - (fulfilment.groupDiscountKobo ?? 0)) + fulfilment.deliveryFeeKobo;
   const refund = await refundOrderAmount({
     orderId: String(fulfilment.order),
     amountKobo: refundKobo,
