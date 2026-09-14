@@ -2,13 +2,13 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler";
 import Order, { ORDER_STATUSES, TRACKING_STATUSES } from "../models/Order";
-import { changeOrderStatus, updateTracking } from "../services/orders";
+import { setOrderStatus, updateTracking, withFulfilments } from "../services/fulfilments";
 
 const StatusSchema = z.object({
   status: z.enum(ORDER_STATUSES, { error: "Invalid order status" }),
 });
 
-const TrackingSchema = z.object({
+export const TrackingSchema = z.object({
   tracking: z.object(
     {
       status: z.preprocess(
@@ -39,31 +39,33 @@ const populateItems = <T extends { populate: (...args: any[]) => T }>(query: T) 
 // GET /api/orders/:id
 export const getOrder = async (req: Request, res: Response) => {
   const user = req.user!;
-  const query = user.role === "admin" ? { _id: req.params.id } : { _id: req.params.id, user: user._id };
+  const isAdmin = user.role === "admin";
+  const query = isAdmin ? { _id: req.params.id } : { _id: req.params.id, user: user._id };
 
   const order = await populateItems(Order.findOne(query));
   if (!order) throw new HttpError(404, "Order not found");
 
-  res.json(withItemNames(order));
+  const [withParcels] = await withFulfilments([withItemNames(order)], isAdmin ? "admin" : "customer");
+  res.json(withParcels);
 };
 
 // GET /api/orders/user/me
 export const getAllOrdersForUser = async (req: Request, res: Response) => {
   const orders = await populateItems(Order.find({ user: req.user!._id }).sort({ createdAt: -1 }));
-  res.json(orders.map(withItemNames));
+  res.json(await withFulfilments(orders.map(withItemNames), "customer"));
 };
 
 // GET /api/orders (admins only)
 export const getAllOrders = async (_req: Request, res: Response) => {
   const orders = await populateItems(Order.find().populate("user", "username email").sort({ createdAt: -1 }));
-  res.json(orders.map(withItemNames));
+  res.json(await withFulfilments(orders.map(withItemNames), "admin"));
 };
 
 // PATCH /api/orders/:id/status (admins only)
 export const updateOrderStatus = async (req: Request, res: Response) => {
   const { status } = StatusSchema.parse(req.body ?? {});
 
-  const order = await changeOrderStatus(req.params.id, status);
+  const order = await setOrderStatus(req.params.id, status);
   if (!order) throw new HttpError(404, "Order not found");
 
   res.json({ message: `Order marked as ${status}`, order });

@@ -18,6 +18,19 @@ import {
   updateRewardSettings,
 } from "../controllers/adminRewardsController";
 import {
+  approveMerchant,
+  getAdminMarketplaceSettings,
+  getMerchantDetail,
+  listMerchants,
+  overrideFulfilment,
+  reinstateMerchant,
+  rejectMerchant,
+  setMerchantCommission,
+  setProductVisibility,
+  suspendMerchant,
+  updateMarketplaceSettings,
+} from "../controllers/adminMerchantsController";
+import {
   createBanner,
   createPriceBand,
   deleteBanner,
@@ -63,5 +76,18 @@ router.delete("/coupons/:id", validId, asyncHandler(deleteCoupon));
 router.get("/wallets", asyncHandler(findCustomerWallet));
 router.get("/wallets/reconciliation", asyncHandler(getReconciliation));
 router.post("/wallets/:userId/adjustments", validateObjectId("userId"), asyncHandler(adjustWallet));
+
+router.get("/merchants", asyncHandler(listMerchants));
+router.get("/merchants/:id", validId, asyncHandler(getMerchantDetail));
+router.post("/merchants/:id/approve", validId, asyncHandler(approveMerchant));
+router.post("/merchants/:id/reject", validId, asyncHandler(rejectMerchant));
+router.post("/merchants/:id/suspend", validId, asyncHandler(suspendMerchant));
+router.post("/merchants/:id/reinstate", validId, asyncHandler(reinstateMerchant));
+router.put("/merchants/:id/commission", validId, asyncHandler(setMerchantCommission));
+
+router.get("/marketplace/settings", asyncHandler(getAdminMarketplaceSettings));
+router.put("/marketplace/settings", asyncHandler(updateMarketplaceSettings));
+router.patch("/fulfilments/:id", validId, asyncHandler(overrideFulfilment));
+router.patch("/products/:id/visibility", validId, asyncHandler(setProductVisibility));
 
 export default router;

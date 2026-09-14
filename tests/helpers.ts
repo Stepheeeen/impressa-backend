@@ -3,6 +3,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
+import Merchant, { MerchantStatus } from "../src/models/Merchant";
 import Order, { OrderStatus } from "../src/models/Order";
 import ProductTemplate from "../src/models/ProductTemplate";
 import RewardSettings from "../src/models/RewardSettings";
@@ -57,6 +58,32 @@ export function createProduct(overrides: Record<string, unknown> = {}) {
     colors: ["red", "black"],
     ...overrides,
   });
+}
+
+export async function createMerchant(
+  overrides: { status?: MerchantStatus; deliveryFeeKobo?: number; commissionPercent?: number | null } = {}
+) {
+  const owner = await createUser();
+  const merchant = await Merchant.create({
+    user: owner.user._id,
+    businessName: `Adire House ${suffix()}`,
+    phone: "0803 123 4567",
+    email: owner.user.email,
+    state: "Ogun",
+    address: "12 Itoku Market Road, Abeokuta",
+    idDocument: { publicId: "merchant-ids/test-id", format: "jpg" },
+    bank: {
+      bankCode: "058",
+      bankName: "Guaranty Trust Bank",
+      accountName: "ADIRE HOUSE LTD",
+      accountNumberLast4: "4321",
+      recipientCode: "RCP_test123",
+    },
+    deliveryFeeKobo: overrides.deliveryFeeKobo ?? 200_000,
+    status: overrides.status ?? "approved",
+    commissionPercent: overrides.commissionPercent ?? null,
+  });
+  return { owner, merchant };
 }
 
 export function setRewardSettings(values: Record<string, unknown>) {

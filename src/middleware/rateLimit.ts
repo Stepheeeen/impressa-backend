@@ -50,6 +50,14 @@ export const registerLimiter = limiter({
   message: "Too many accounts created from this network. Try again later.",
 });
 
+// Checking bank account numbers costs Paystack calls and could be used to look up account names.
+export const bankLookupLimiter = limiter({
+  windowMs: 60 * MINUTE,
+  limit: 20,
+  keyGenerator: (req) => `${clientIp(req)}:${req.user?.id ?? ""}`,
+  message: "Too many bank account checks. Try again in an hour.",
+});
+
 export const passwordResetLimiter = limiter({
   windowMs: 60 * MINUTE,
   limit: 5,

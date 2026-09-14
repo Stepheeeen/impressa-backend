@@ -53,6 +53,67 @@ export async function initializeTransaction({
   }
 }
 
+export type Bank = { name: string; code: string };
+
+const BANK_LIST_TTL_MS = 24 * 60 * 60 * 1000;
+let bankCache: { banks: Bank[]; fetchedAt: number } | null = null;
+
+export async function listBanks(): Promise<Bank[]> {
+  if (bankCache && Date.now() - bankCache.fetchedAt < BANK_LIST_TTL_MS) return bankCache.banks;
+  try {
+    const { data } = await client.get("/bank", { params: { country: "nigeria", currency: "NGN" } });
+    const banks = (data.data as any[])
+      .filter((bank) => bank.active !== false && !bank.is_deleted)
+      .map((bank) => ({ name: String(bank.name), code: String(bank.code) }));
+    bankCache = { banks, fetchedAt: Date.now() };
+    return banks;
+  } catch (err) {
+    logPaystackError("list banks", err);
+    throw new HttpError(502, "Couldn't load the list of banks. Try again.");
+  }
+}
+
+// Confirms an account number with the bank and returns the name on the account.
+export async function resolveBankAccount(accountNumber: string, bankCode: string) {
+  try {
+    const { data } = await client.get("/bank/resolve", {
+      params: { account_number: accountNumber, bank_code: bankCode },
+    });
+    return { accountName: String(data.data.account_name), accountNumber: String(data.data.account_number) };
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response && err.response.status < 500) {
+      throw new HttpError(400, "We couldn't verify that account number with the bank. Check the details and try again.");
+    }
+    logPaystackError("resolve account", err);
+    throw new HttpError(502, "Couldn't reach the bank to verify the account. Try again.");
+  }
+}
+
+// Saves a bank account on Paystack so payouts can be sent to it. Returns the recipient code.
+export async function createTransferRecipient({
+  name,
+  accountNumber,
+  bankCode,
+}: {
+  name: string;
+  accountNumber: string;
+  bankCode: string;
+}) {
+  try {
+    const { data } = await client.post("/transferrecipient", {
+      type: "nuban",
+      name,
+      account_number: accountNumber,
+      bank_code: bankCode,
+      currency: "NGN",
+    });
+    return String(data.data.recipient_code);
+  } catch (err) {
+    logPaystackError("create transfer recipient", err);
+    throw new HttpError(502, "Couldn't save the bank account for payouts. Try again.");
+  }
+}
+
 // Returns null when Paystack doesn't recognise the reference.
 export async function verifyTransaction(reference: string): Promise<PaystackTransaction | null> {
   try {

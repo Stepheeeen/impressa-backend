@@ -3,13 +3,15 @@ import { getTemplates, createTemplate, updateTemplate, deleteTemplate, setProduc
 import { protect } from "../middleware/authMiddleware";
 import { asyncHandler } from "../middleware/errorHandler";
 import { isAdmin } from "../middleware/isAdmin";
+import { optionalAuth } from "../middleware/optionalAuth";
 import { validateObjectId } from "../middleware/validate";
 
 const router = express.Router();
 const validId = validateObjectId("id");
 
-router.get("/", asyncHandler(getTemplates));
-router.get("/:id", validId, asyncHandler(getTemplateById));
+// Public, but admins signed in to the panel also see hidden products.
+router.get("/", optionalAuth, asyncHandler(getTemplates));
+router.get("/:id", validId, optionalAuth, asyncHandler(getTemplateById));
 
 router.post("/", protect, isAdmin, asyncHandler(createTemplate));
 

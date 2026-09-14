@@ -27,6 +27,10 @@ const EnvSchema = z.object({
   // Known once the app is live on the App Store.
   IOS_APP_STORE_URL: z.url().optional(),
   ANDROID_PLAY_STORE_URL: z.url().default("https://play.google.com/store/apps/details?id=com.impressa.app"),
+  // Used to sign private merchant ID uploads and view them from the admin panel.
+  CLOUDINARY_CLOUD_NAME: z.string().default("dlyu92juc"),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
 });
 
 const REQUIRED_IN_PRODUCTION = ["CORS_ORIGINS", "APP_URL", "RESEND_API_KEY", "EMAIL_FROM"] as const;

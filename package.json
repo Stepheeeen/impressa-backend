@@ -15,6 +15,7 @@
     "@sentry/node": "^10.74.0",
     "axios": "^1.6.5",
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "expo-server-sdk": "^3",

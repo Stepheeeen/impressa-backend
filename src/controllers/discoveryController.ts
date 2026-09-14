@@ -108,18 +108,31 @@ export const getPriceBands = async (_req: Request, res: Response) => {
 
 // GET /api/home — everything the app's home screen needs in one request, for slow connections.
 export const getHome = async (_req: Request, res: Response) => {
-  const inStock = { inStock: { $ne: false } };
+  const inStock = {
+    inStock: { $ne: false },
+    stockQuantity: { $ne: 0 },
+    hidden: { $ne: true },
+    sellerActive: { $ne: false },
+  };
   const [banners, priceBands, featured, categories] = await Promise.all([
     Banner.find(liveBannerFilter()).sort(BANNER_ORDER).lean(),
     PriceBand.find({ active: true }).sort(PRICE_BAND_ORDER).lean(),
-    ProductTemplate.find({ ...inStock, isFeatured: true }).sort({ updatedAt: -1 }).limit(HOME_PRODUCT_LIMIT).lean(),
-    ProductTemplate.distinct("category"),
+    ProductTemplate.find({ ...inStock, isFeatured: true })
+      .populate("merchant", "businessName")
+      .sort({ updatedAt: -1 })
+      .limit(HOME_PRODUCT_LIMIT)
+      .lean(),
+    ProductTemplate.distinct("category", { hidden: { $ne: true }, sellerActive: { $ne: false } }),
   ]);
 
   const products =
     featured.length > 0
       ? featured
-      : await ProductTemplate.find(inStock).sort({ createdAt: -1 }).limit(HOME_PRODUCT_LIMIT).lean();
+      : await ProductTemplate.find(inStock)
+          .populate("merchant", "businessName")
+          .sort({ createdAt: -1 })
+          .limit(HOME_PRODUCT_LIMIT)
+          .lean();
 
   res.set("Cache-Control", "public, max-age=60");
   res.json({

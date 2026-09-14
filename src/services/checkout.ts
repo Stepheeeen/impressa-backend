@@ -1,7 +1,7 @@
 import { HttpError } from "../middleware/errorHandler";
 import type { IRewardSettings } from "../models/RewardSettings";
 import { AppliedCoupon, applyCoupon } from "./coupons";
-import { DELIVERY_FEE_KOBO, PricedCart, priceCart, toNaira } from "./pricing";
+import { PricedCart, priceCart, toNaira } from "./pricing";
 import { getRewardSettings } from "./rewardSettings";
 import { getAvailableCreditKobo } from "./wallet";
 
@@ -62,7 +62,7 @@ export async function quoteCheckout({
 
   const discountKobo = coupon?.discountKobo ?? 0;
   const itemsKobo = subtotalKobo - discountKobo;
-  const totalKobo = itemsKobo + DELIVERY_FEE_KOBO;
+  const totalKobo = itemsKobo + priced.deliveryFeeKobo;
 
   const walletBalanceKobo = settings.walletEnabled ? await getAvailableCreditKobo(userId) : 0;
   let walletAppliedKobo = useWallet ? Math.min(walletBalanceKobo, walletLimitKobo(settings, itemsKobo, totalKobo)) : 0;
@@ -75,7 +75,7 @@ export async function quoteCheckout({
   return {
     priced,
     subtotalKobo,
-    deliveryFeeKobo: DELIVERY_FEE_KOBO,
+    deliveryFeeKobo: priced.deliveryFeeKobo,
     discountKobo,
     coupon,
     couponError,
@@ -99,5 +99,11 @@ export function toQuoteResponse(quote: CheckoutQuote) {
     cardAmount: toNaira(quote.cardKobo),
     itemCount: quote.priced.itemCount,
     hasUnavailableItems: quote.priced.hasUnavailable,
+    sellers: quote.priced.sellers.map((seller) => ({
+      merchantId: seller.merchantId,
+      name: seller.name,
+      deliveryFee: toNaira(seller.deliveryFeeKobo),
+      itemsSubtotal: toNaira(seller.itemsSubtotalKobo),
+    })),
   };
 }

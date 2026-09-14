@@ -20,10 +20,16 @@ const ListQuerySchema = z.object({
   featured: z.enum(["true", "false"]).optional(),
 });
 
-// GET /api/templates — with no query it returns every product, as the website expects.
+// Customers never see hidden products or products from suspended sellers; admins see everything.
+const visibleTo = (req: Request): Record<string, unknown> =>
+  req.user?.role === "admin" ? {} : { hidden: { $ne: true }, sellerActive: { $ne: false } };
+
+const SELLER_FIELDS = "businessName ratingAverage ratingCount";
+
+// GET /api/templates — with no query it returns every listed product, as the website expects.
 export const getTemplates = async (req: Request, res: Response) => {
   const query = ListQuerySchema.parse(req.query);
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = visibleTo(req);
 
   if (query.category) filter.category = query.category;
   if (query.itemType) filter.itemType = query.itemType;
@@ -37,6 +43,7 @@ export const getTemplates = async (req: Request, res: Response) => {
 
   const templates = await ProductTemplate.find(filter)
     .collation({ locale: "en", strength: 2 })
+    .populate("merchant", SELLER_FIELDS)
     .sort({ createdAt: -1 });
   res.json(templates);
 };
@@ -268,7 +275,7 @@ export const getTemplateById = async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
 
-    const template = await ProductTemplate.findById(id);
+    const template = await ProductTemplate.findOne({ _id: id, ...visibleTo(req) }).populate("merchant", SELLER_FIELDS);
 
     if (!template) {
       return res.status(404).json({ error: "Product not found" });

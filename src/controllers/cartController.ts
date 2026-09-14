@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler";
 import Cart from "../models/Cart";
-import ProductTemplate from "../models/ProductTemplate";
+import Merchant from "../models/Merchant";
+import ProductTemplate, { IProductTemplate } from "../models/ProductTemplate";
 import { MAX_ITEM_QUANTITY, priceCart, toCartResponse } from "../services/pricing";
 
 const quantityField = z.coerce
@@ -20,6 +21,24 @@ const AddToCartSchema = z.object({
   color: z.string().trim().max(40).nullish(),
 });
 
+// Hidden products, suspended sellers and unapproved merchants can't be bought.
+async function ensureListed(product: Pick<IProductTemplate, "hidden" | "sellerActive" | "merchant"> | null) {
+  const unavailable = new HttpError(404, "This product is no longer available.");
+  if (!product || product.hidden || product.sellerActive === false) throw unavailable;
+  if (product.merchant) {
+    const merchant = await Merchant.findById(product.merchant).select("status").lean();
+    if (merchant?.status !== "approved") throw unavailable;
+  }
+}
+
+function ensureStock(product: Pick<IProductTemplate, "stockQuantity">, quantity: number) {
+  if (typeof product.stockQuantity !== "number" || product.stockQuantity >= quantity) return;
+  throw new HttpError(
+    400,
+    product.stockQuantity === 0 ? "This product is out of stock." : `Only ${product.stockQuantity} left in stock.`
+  );
+}
+
 const UpdateQuantitySchema = z.object({
   id: z.string({ error: "Item not found in cart." }).regex(/^[a-f0-9]{24}$/i, "Item not found in cart."),
   quantity: quantityField,
@@ -34,7 +53,8 @@ export const addToCart = async (req: Request, res: Response) => {
   const color = input.color || undefined;
 
   const product = await ProductTemplate.findById(input.templateId).lean();
-  if (!product) throw new HttpError(404, "This product is no longer available.");
+  await ensureListed(product);
+  if (!product) return;
   if (product.inStock === false) throw new HttpError(400, "This product is out of stock.");
   if (!(Number(product.price) > 0)) throw new HttpError(400, "This product isn't available to buy yet.");
   if (size && product.sizes?.length && !product.sizes.includes(size)) {
@@ -53,6 +73,8 @@ export const addToCart = async (req: Request, res: Response) => {
       (item.size ?? undefined) === size &&
       (item.color ?? undefined) === color
   );
+
+  ensureStock(product, Math.min((existing?.quantity ?? 0) + input.quantity, MAX_ITEM_QUANTITY));
 
   // The stored price is only a record of what was shown; checkout always reprices from the product.
   if (existing) {
@@ -94,6 +116,13 @@ export const clearCart = async (req: Request, res: Response) => {
 export const updateCartQuantity = async (req: Request, res: Response) => {
   const { id, quantity } = UpdateQuantitySchema.parse(req.body ?? {});
   const userId = req.user!.id;
+
+  const cart = await Cart.findOne({ user: userId, "items._id": id }, { "items.$": 1 }).lean();
+  const templateId = cart?.items?.[0]?.templateId;
+  if (templateId) {
+    const product = await ProductTemplate.findById(templateId).select("stockQuantity").lean();
+    if (product) ensureStock(product, quantity);
+  }
 
   const result = await Cart.updateOne({ user: userId, "items._id": id }, { $set: { "items.$.quantity": quantity } });
   if (result.matchedCount === 0) throw new HttpError(404, "Item not found in cart.");

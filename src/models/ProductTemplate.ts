@@ -14,6 +14,12 @@ export interface IProductTemplate extends Document {
   inStock: boolean;
   description?: string;
   videoUrl?: string | null;
+  merchant?: mongoose.Types.ObjectId | null;
+  stockQuantity?: number | null;
+  hidden?: boolean;
+  sellerActive?: boolean;
+  ratingAverage?: number;
+  ratingCount?: number;
 }
 
 const ProductTemplateSchema: Schema = new Schema(
@@ -35,6 +41,17 @@ const ProductTemplateSchema: Schema = new Schema(
     description: { type: String },
     // Optional product video (hosted on Cloudinary, like the images).
     videoUrl: { type: String, default: null },
+
+    // The merchant selling it; null for Impressa's own products.
+    merchant: { type: Schema.Types.ObjectId, ref: "Merchant", default: null, index: true },
+    // Units left. null means stock isn't tracked (Impressa's existing products use inStock instead).
+    stockQuantity: { type: Number, default: null, min: 0 },
+    // Hidden by an admin.
+    hidden: { type: Boolean, default: false },
+    // False while the merchant is suspended.
+    sellerActive: { type: Boolean, default: true },
+    ratingAverage: { type: Number, default: 0 },
+    ratingCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

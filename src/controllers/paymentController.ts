@@ -31,11 +31,12 @@ type Delivery = Pick<z.infer<typeof CheckoutSchema>, "state" | "address" | "phon
 
 // Everything the order is built from once payment succeeds. totalAmount is what the card is charged.
 function orderMetadata(userId: string, quote: CheckoutQuote, delivery: Delivery) {
-  const { lines, itemCount } = quote.priced;
+  const { lines, itemCount, sellers } = quote.priced;
   return {
     userId,
     cart: lines.map((line) => ({
       templateId: line.templateId,
+      merchantId: line.merchantId,
       title: line.title,
       quantity: line.quantity,
       unitPrice: toNaira(line.unitPriceKobo),
@@ -56,6 +57,12 @@ function orderMetadata(userId: string, quote: CheckoutQuote, delivery: Delivery)
     walletApplied: toNaira(quote.walletAppliedKobo),
     orderTotal: toNaira(quote.totalKobo),
     totalAmount: toNaira(quote.cardKobo),
+    // Each seller becomes a fulfilment with its own delivery fee once payment succeeds.
+    sellers: sellers.map((seller) => ({
+      merchantId: seller.merchantId,
+      name: seller.name,
+      deliveryFee: toNaira(seller.deliveryFeeKobo),
+    })),
   };
 }
 
