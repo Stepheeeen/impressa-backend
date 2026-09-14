@@ -1,19 +1,60 @@
 import * as Sentry from "@sentry/node";
-import Order, { OrderStatus } from "../models/Order";
+import Order, { ORDER_STATUSES, OrderStatus, TrackingStatus } from "../models/Order";
 import type { PaystackTransaction } from "./paystack";
 import { notifyOrderStatus } from "./push";
 
-// Updates an order's status and notifies the customer when it actually changed. Returns null if the order doesn't exist.
+// Updates an order's status, records it in the history and notifies the customer. Returns null if the order doesn't exist.
 export async function changeOrderStatus(orderId: string, status: OrderStatus) {
-  const previous = await Order.findByIdAndUpdate(orderId, { status }, { new: false });
-  if (!previous) return null;
+  // Only matches when the status actually changes, so repeated clicks don't add history or send duplicate notifications.
+  const changed = await Order.findOneAndUpdate(
+    { _id: orderId, status: { $ne: status } },
+    { $set: { status }, $push: { statusHistory: { status, at: new Date() } } },
+    { new: true }
+  );
 
-  if (previous.status !== status) {
-    notifyOrderStatus({ userId: String(previous.user), orderId: String(previous._id), status });
+  if (changed) {
+    notifyOrderStatus({ userId: String(changed.user), orderId: String(changed._id), status });
+    return changed;
   }
 
-  const order = previous.toObject();
-  order.status = status;
+  return Order.findById(orderId);
+}
+
+// The admin panel only sets delivery stages, so these stages move the order along (and notify the customer).
+const ORDER_STATUS_FOR_TRACKING: Partial<Record<TrackingStatus, OrderStatus>> = {
+  "in-transit": "shipped",
+  "ready-for-pickup": "shipped",
+  delivered: "delivered",
+};
+
+type TrackingUpdate = { status?: TrackingStatus | null; code?: string | null };
+
+// Saves the delivery stage and tracking code. Empty values clear them. Returns null if the order doesn't exist.
+export async function updateTracking(orderId: string, tracking: TrackingUpdate) {
+  const set: Record<string, unknown> = { "tracking.updatedAt": new Date() };
+  const unset: Record<string, 1> = {};
+
+  if (tracking.status !== undefined) {
+    if (tracking.status) set["tracking.status"] = tracking.status;
+    else unset["tracking.status"] = 1;
+  }
+  if (tracking.code !== undefined) {
+    if (tracking.code) set["tracking.code"] = tracking.code;
+    else unset["tracking.code"] = 1;
+  }
+
+  const order = await Order.findByIdAndUpdate(
+    orderId,
+    { $set: set, ...(Object.keys(unset).length > 0 ? { $unset: unset } : {}) },
+    { new: true }
+  );
+  if (!order) return null;
+
+  const nextStatus = tracking.status ? ORDER_STATUS_FOR_TRACKING[tracking.status] : undefined;
+  // Never move an order backwards, e.g. choosing "in transit" after it was delivered.
+  if (nextStatus && ORDER_STATUSES.indexOf(nextStatus) > ORDER_STATUSES.indexOf(order.status)) {
+    return changeOrderStatus(orderId, nextStatus);
+  }
   return order;
 }
 
@@ -77,6 +118,7 @@ export async function createOrderFromPayment(tx: PaystackTransaction) {
       },
       paymentRef: tx.reference,
       status: "paid",
+      statusHistory: [{ status: "paid", at: new Date() }],
       email: tx.customer?.email,
       items: cart,
       itemNames: cart.map((item, index) => item.title || item.name || `item-${index + 1}`),

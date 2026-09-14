@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { z } from "zod";
 import ProductTemplate from "../models/ProductTemplate";
 
 const normalizeStringArray = (value: any): string[] => {
@@ -9,20 +10,35 @@ const normalizeStringArray = (value: any): string[] => {
     .filter((v) => v.length > 0);
 };
 
-// Get all templates
+const isHttpsUrl = (value: unknown) => typeof value === "string" && /^https:\/\/\S+$/.test(value.trim());
+
+const ListQuerySchema = z.object({
+  category: z.string().trim().optional(),
+  itemType: z.string().trim().optional(),
+  minPrice: z.coerce.number({ error: "minPrice must be a number." }).min(0).optional(),
+  maxPrice: z.coerce.number({ error: "maxPrice must be a number." }).positive().optional(),
+  featured: z.enum(["true", "false"]).optional(),
+});
+
+// GET /api/templates — with no query it returns every product, as the website expects.
 export const getTemplates = async (req: Request, res: Response) => {
-  try {
-    const { category, itemType } = req.query;
-    const filter: any = {};
+  const query = ListQuerySchema.parse(req.query);
+  const filter: Record<string, unknown> = {};
 
-    if (category) filter.category = category;
-    if (itemType) filter.itemType = itemType;
+  if (query.category) filter.category = query.category;
+  if (query.itemType) filter.itemType = query.itemType;
+  if (query.featured) filter.isFeatured = query.featured === "true";
 
-    const templates = await ProductTemplate.find(filter).sort({ createdAt: -1 });
-    res.json(templates);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch templates" });
-  }
+  // Price bands include the minimum and exclude the maximum, so neighbouring bands don't overlap.
+  const price: Record<string, number> = {};
+  if (query.minPrice !== undefined) price.$gte = query.minPrice;
+  if (query.maxPrice !== undefined) price.$lt = query.maxPrice;
+  if (Object.keys(price).length > 0) filter.price = price;
+
+  const templates = await ProductTemplate.find(filter)
+    .collation({ locale: "en", strength: 2 })
+    .sort({ createdAt: -1 });
+  res.json(templates);
 };
 
 // ✅ Create New Product Template (Supports Multiple Images)
@@ -57,6 +73,7 @@ export const createTemplate = async (req: Request, res: Response) => {
         customizable,
         isFeatured,
         description,
+        videoUrl,
       } = product;
 
       if (
@@ -68,6 +85,9 @@ export const createTemplate = async (req: Request, res: Response) => {
         imageUrls.length === 0
       ) {
         throw new Error(`Invalid product data at index ${index}`);
+      }
+      if (videoUrl && !isHttpsUrl(videoUrl)) {
+        throw new Error(`Video must be an https link (product ${index + 1})`);
       }
 
       return {
@@ -82,6 +102,7 @@ export const createTemplate = async (req: Request, res: Response) => {
         customizable: customizable ?? false,
         isFeatured: isFeatured ?? false,
         description: description ?? null,
+        videoUrl: videoUrl ? String(videoUrl).trim() : null,
       };
     });
 
@@ -193,6 +214,7 @@ export const editTemplate = async (req: Request, res: Response) => {
       "inStock",
       "isFeatured",
       "description",
+      "videoUrl",
     ];
 
     // Prevent unwanted fields from updating
@@ -211,6 +233,16 @@ export const editTemplate = async (req: Request, res: Response) => {
     }
     if (updateData.tags !== undefined) {
       updateData.tags = normalizeStringArray(updateData.tags);
+    }
+    if (updateData.videoUrl !== undefined) {
+      // An empty value removes the video.
+      if (!updateData.videoUrl) {
+        updateData.videoUrl = null;
+      } else if (!isHttpsUrl(updateData.videoUrl)) {
+        return res.status(400).json({ error: "Video must be an https link." });
+      } else {
+        updateData.videoUrl = String(updateData.videoUrl).trim();
+      }
     }
 
     const updated = await ProductTemplate.findByIdAndUpdate(id, updateData, {

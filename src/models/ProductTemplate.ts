@@ -13,6 +13,7 @@ export interface IProductTemplate extends Document {
   isFeatured: boolean;
   inStock: boolean;
   description?: string;
+  videoUrl?: string | null;
 }
 
 const ProductTemplateSchema: Schema = new Schema(
@@ -32,6 +33,8 @@ const ProductTemplateSchema: Schema = new Schema(
     isFeatured: { type: Boolean, default: false },
     inStock: { type: Boolean, default: true },
     description: { type: String },
+    // Optional product video (hosted on Cloudinary, like the images).
+    videoUrl: { type: String, default: null },
   },
   { timestamps: true }
 );

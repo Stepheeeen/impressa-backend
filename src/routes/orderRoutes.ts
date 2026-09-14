@@ -5,6 +5,7 @@ import {
   getAllOrdersForUser,
   getOrder,
   updateOrderStatus,
+  updateOrderTracking,
 } from "../controllers/orderController";
 import { protect } from "../middleware/authMiddleware";
 import { asyncHandler } from "../middleware/errorHandler";
@@ -20,6 +21,7 @@ router.get("/user/me", protect, asyncHandler(getAllOrdersForUser));
 
 router.get("/:id", protect, validateObjectId("id"), asyncHandler(getOrder));
 router.patch("/:id/status", protect, isAdmin, validateObjectId("id"), asyncHandler(updateOrderStatus));
+router.patch("/:id/tracking", protect, isAdmin, validateObjectId("id"), asyncHandler(updateOrderTracking));
 
 // Optional: Delete an order
 router.delete("/:id", protect, isAdmin, validateObjectId("id"), asyncHandler(deleteOrder));

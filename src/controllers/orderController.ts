@@ -1,11 +1,24 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler";
-import Order, { ORDER_STATUSES } from "../models/Order";
-import { changeOrderStatus } from "../services/orders";
+import Order, { ORDER_STATUSES, TRACKING_STATUSES } from "../models/Order";
+import { changeOrderStatus, updateTracking } from "../services/orders";
 
 const StatusSchema = z.object({
   status: z.enum(ORDER_STATUSES, { error: "Invalid order status" }),
+});
+
+const TrackingSchema = z.object({
+  tracking: z.object(
+    {
+      status: z.preprocess(
+        (value) => (value === "" ? null : value),
+        z.enum(TRACKING_STATUSES, { error: "Invalid tracking status" }).nullish()
+      ),
+      code: z.string().trim().max(300, "Tracking code is too long.").nullish(),
+    },
+    { error: "Tracking details are required." }
+  ),
 });
 
 // Older orders don't always store item titles, so fall back through everything that might hold one.
@@ -54,6 +67,16 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
   if (!order) throw new HttpError(404, "Order not found");
 
   res.json({ message: `Order marked as ${status}`, order });
+};
+
+// PATCH /api/orders/:id/tracking (admins only)
+export const updateOrderTracking = async (req: Request, res: Response) => {
+  const { tracking } = TrackingSchema.parse(req.body ?? {});
+
+  const order = await updateTracking(req.params.id, tracking);
+  if (!order) throw new HttpError(404, "Order not found");
+
+  res.json({ message: "Tracking updated", order });
 };
 
 // DELETE /api/orders/:id (admins only)

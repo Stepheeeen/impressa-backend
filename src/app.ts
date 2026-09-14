@@ -16,6 +16,7 @@ import paymentRoutes from "./routes/paymentRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 import deviceRoutes from "./routes/deviceRoutes";
 import appConfigRoutes from "./routes/appConfigRoutes";
+import discoveryRoutes from "./routes/discoveryRoutes";
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use("/api/pay", paymentRoutes);
 app.use("/api/admin/dashboard", dashboardRoutes);
 app.use("/api/devices", deviceRoutes);
 app.use("/api/app", appConfigRoutes);
+app.use("/api", discoveryRoutes);
 
 app.use(notFound);
 Sentry.setupExpressErrorHandler(app);
