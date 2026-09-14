@@ -22,6 +22,7 @@ import merchantRoutes from "./routes/merchantRoutes";
 import marketplaceRoutes from "./routes/marketplaceRoutes";
 import groupBuyRoutes from "./routes/groupBuyRoutes";
 import sharedCartRoutes from "./routes/sharedCartRoutes";
+import supportRoutes from "./routes/supportRoutes";
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.use("/api", merchantRoutes);
 app.use("/api", marketplaceRoutes);
 app.use("/api", groupBuyRoutes);
 app.use("/api", sharedCartRoutes);
+app.use("/api", supportRoutes);
 
 app.use(notFound);
 Sentry.setupExpressErrorHandler(app);

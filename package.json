@@ -12,6 +12,7 @@
     "check:payments": "node dist/scripts/checkDuplicatePayments.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0",
     "@sentry/node": "^10.74.0",
     "axios": "^1.6.5",
     "bcryptjs": "^2.4.3",

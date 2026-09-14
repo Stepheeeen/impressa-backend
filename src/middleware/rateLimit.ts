@@ -58,6 +58,14 @@ export const bankLookupLimiter = limiter({
   message: "Too many bank account checks. Try again in an hour.",
 });
 
+// Every chat message is a paid AI call.
+export const supportChatLimiter = limiter({
+  windowMs: 10 * MINUTE,
+  limit: 30,
+  keyGenerator: (req) => `${clientIp(req)}:${req.user?.id ?? ""}`,
+  message: "You're sending messages very quickly. Wait a few minutes and try again.",
+});
+
 export const passwordResetLimiter = limiter({
   windowMs: 60 * MINUTE,
   limit: 5,
