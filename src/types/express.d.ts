@@ -1,10 +1,12 @@
-import { UserDocument } from "../../models/User"; // Adjust the path if needed
+import { IUser } from "../models/User";
 
 declare global {
-    namespace Express {
-        interface Request {
-            user?: UserDocument; // or a minimal user shape { _id: string; role: string; ... }
-            rawBody?: Buffer;
-        }
+  namespace Express {
+    interface Request {
+      user?: IUser;
+      rawBody?: Buffer;
     }
+  }
 }
+
+export {};

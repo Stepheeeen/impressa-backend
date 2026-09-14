@@ -1,40 +1,41 @@
 import { Request, Response } from "express";
+import { HttpError } from "../middleware/errorHandler";
 import Design from "../models/Design";
 
 // POST /api/designs
-export const createDesign = async (req: any, res: Response) => {
-  try {
-    const { title, itemType, imageUrl, color, size, textLayers } = req.body;
-    const design = await Design.create({
-      user: req.user.id,
-      title,
-      itemType,
-      imageUrl,
-      color,
-      size,
-      textLayers,
-    });
-    res.status(201).json(design);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to create design" });
-  }
+export const createDesign = async (req: Request, res: Response) => {
+  const { title, itemType, imageUrl, color, size, textLayers } = req.body ?? {};
+  const design = await Design.create({
+    user: req.user!.id,
+    title,
+    itemType,
+    imageUrl,
+    color,
+    size,
+    textLayers,
+  });
+  res.status(201).json(design);
 };
 
 // GET /api/designs/:id
-export const getDesign = async (req: any, res: Response) => {
+export const getDesign = async (req: Request, res: Response) => {
+  const user = req.user!;
   const design = await Design.findById(req.params.id);
-  if (!design) return res.status(404).json({ error: "Not found" });
+  // Only the owner or an admin can see a design; everyone else gets the same 404 as a missing one.
+  if (!design || (design.user.toString() !== user.id && user.role !== "admin")) {
+    throw new HttpError(404, "Design not found");
+  }
   res.json(design);
 };
 
-// GET /api/users/me/designs
-export const getUserDesigns = async (req: any, res: Response) => {
-  const designs = await Design.find({ user: req.user.id }).sort({ createdAt: -1 });
+// GET /api/designs/user/me
+export const getUserDesigns = async (req: Request, res: Response) => {
+  const designs = await Design.find({ user: req.user!.id }).sort({ createdAt: -1 });
   res.json(designs);
 };
 
 // DELETE /api/designs/:id
-export const deleteDesign = async (req: any, res: Response) => {
-  await Design.findOneAndDelete({ _id: req.params.id, user: req.user.id });
+export const deleteDesign = async (req: Request, res: Response) => {
+  await Design.findOneAndDelete({ _id: req.params.id, user: req.user!.id });
   res.status(200).json({ message: "Deleted" });
 };

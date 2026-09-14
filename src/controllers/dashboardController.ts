@@ -3,6 +3,9 @@ import Order from "../models/Order";
 import ProductTemplate from "../models/ProductTemplate";
 import User from "../models/User";
 
+// Orders move on from "paid" to "shipped" and "delivered"; all of them are revenue.
+const REVENUE_STATUSES = ["paid", "shipped", "delivered"];
+
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const now = new Date();
@@ -20,7 +23,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
     // ✅ TOTAL REVENUE (sum of all paid orders, in NGN)
     const revenueAgg = await Order.aggregate([
-      { $match: { status: "paid" } },
+      { $match: { status: { $in: REVENUE_STATUSES } } },
       { $group: { _id: null, revenue: { $sum: "$totalAmount" } } },
     ]);
     const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].revenue : 0;
@@ -34,7 +37,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const lastMonthRevAgg = await Order.aggregate([
       {
         $match: {
-          status: "paid",
+          status: { $in: REVENUE_STATUSES },
           createdAt: { $gte: lastMonth },
         },
       },

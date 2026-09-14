@@ -1,51 +1,44 @@
 // src/controllers/adminController.ts
 import { Request, Response } from "express";
-import Order from "../models/Order";
+import { z } from "zod";
+import { HttpError } from "../middleware/errorHandler";
 import Design from "../models/Design";
+import Order, { ORDER_STATUSES } from "../models/Order";
+
+const StatusSchema = z.object({
+  status: z.enum(ORDER_STATUSES, { error: "Invalid order status" }),
+});
 
 // GET /api/admin/orders
-export const getAllOrders = async (req: Request, res: Response) => {
-  try {
-    const orders = await Order.find()
-      .populate("user", "name email")
-      .populate({
-        path: "items.templateId",
-        model: "ProductTemplate",
-        select: "title imageUrls price sizes colors inStock",
-      })
-      .populate({
-        path: "items.designId",
-        model: "Design",
-        select: "title imageUrl",
-      })
-      .sort({ createdAt: -1 });
-    res.json(orders);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch orders" });
-  }
+export const getAllOrders = async (_req: Request, res: Response) => {
+  const orders = await Order.find()
+    .populate("user", "username email")
+    .populate({
+      path: "items.templateId",
+      model: "ProductTemplate",
+      select: "title imageUrls price sizes colors inStock",
+    })
+    .populate({
+      path: "items.designId",
+      model: "Design",
+      select: "title imageUrl",
+    })
+    .sort({ createdAt: -1 });
+  res.json(orders);
 };
 
 // PATCH /api/admin/orders/:id
 export const updateOrderStatus = async (req: Request, res: Response) => {
-  try {
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ error: "Order not found" });
+  const { status } = StatusSchema.parse(req.body ?? {});
 
-    order.status = req.body.status || order.status;
-    await order.save();
+  const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+  if (!order) throw new HttpError(404, "Order not found");
 
-    res.json({ message: "Order updated", order });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to update order" });
-  }
+  res.json({ message: "Order updated", order });
 };
 
 // GET /api/admin/designs
-export const getAllDesigns = async (req: Request, res: Response) => {
-  try {
-    const designs = await Design.find().populate("user", "name email");
-    res.json(designs);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch designs" });
-  }
+export const getAllDesigns = async (_req: Request, res: Response) => {
+  const designs = await Design.find().populate("user", "username email");
+  res.json(designs);
 };

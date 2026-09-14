@@ -6,12 +6,14 @@ import {
   deleteDesign,
 } from "../controllers/designController";
 import { protect } from "../middleware/authMiddleware";
+import { asyncHandler } from "../middleware/errorHandler";
+import { validateObjectId } from "../middleware/validate";
 
 const router = express.Router();
 
-router.post("/", protect, createDesign);
-router.get("/:id", protect, getDesign);
-router.get("/user/me", protect, getUserDesigns);
-router.delete("/:id", protect, deleteDesign);
+router.post("/", protect, asyncHandler(createDesign));
+router.get("/user/me", protect, asyncHandler(getUserDesigns));
+router.get("/:id", protect, validateObjectId("id"), asyncHandler(getDesign));
+router.delete("/:id", protect, validateObjectId("id"), asyncHandler(deleteDesign));
 
 export default router;

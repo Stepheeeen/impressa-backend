@@ -1,238 +1,102 @@
 import { Request, Response } from "express";
+import { z } from "zod";
+import { HttpError } from "../middleware/errorHandler";
 import Cart from "../models/Cart";
+import ProductTemplate from "../models/ProductTemplate";
+import { MAX_ITEM_QUANTITY, priceCart, toCartResponse } from "../services/pricing";
 
-// ✅ Helper: Get or create cart for user
-const getOrCreateCart = async (userId: string) => {
-  let cart = await Cart.findOne({ user: userId });
-  if (!cart) cart = await Cart.create({ user: userId, items: [] });
-  return cart;
-};
+const quantityField = z.coerce
+  .number({ error: "Quantity must be a number." })
+  .int("Quantity must be a whole number.")
+  .min(1, "Quantity must be at least 1.")
+  .max(MAX_ITEM_QUANTITY, `You can add up to ${MAX_ITEM_QUANTITY} of an item.`);
 
-// ✅ Add item to cart (with merge logic)
-export const addToCart = async (req: any, res: Response) => {
-  try {
-    const userId = req.user.id;
-    const { templateId, designId, itemType, quantity = 1, price, size, color, description } = req.body;
+// Any price, itemType or designId sent by the client is stripped here.
+const AddToCartSchema = z.object({
+  templateId: z.string({ error: "Choose a product to add." }).regex(/^[a-f0-9]{24}$/i, "Choose a product to add."),
+  quantity: quantityField.default(1),
+  // The website sends null when a product has no sizes or colours.
+  size: z.string().trim().max(20).nullish(),
+  color: z.string().trim().max(40).nullish(),
+});
 
-    const cart = await getOrCreateCart(userId);
+const UpdateQuantitySchema = z.object({
+  id: z.string({ error: "Item not found in cart." }).regex(/^[a-f0-9]{24}$/i, "Item not found in cart."),
+  quantity: quantityField,
+});
 
-    // ✅ Try to find existing matching item
-    const existingItem = cart.items.find((item: any) =>
-      item.templateId?.toString() === templateId &&
-      item.designId?.toString() === designId &&
-      item.itemType === itemType &&
-      item.size === size &&
-      item.color === color &&
-      item.description === description
-    );
+// POST /api/cart/add
+export const addToCart = async (req: Request, res: Response) => {
+  if (req.body?.designId) throw new HttpError(400, "Custom designs can't be ordered yet.");
 
-    // ✅ Optional: validate stock & size availability when a template is provided
-    if (templateId) {
-      const ProductTemplate = (await import("../models/ProductTemplate")).default;
-      const tpl = await ProductTemplate.findById(templateId).lean();
-      if (!tpl) return res.status(404).json({ error: "Product template not found" });
-      if (tpl.inStock === false) {
-        return res.status(400).json({ error: "Product is currently out of stock" });
-      }
-      if (size && Array.isArray(tpl.sizes) && tpl.sizes.length > 0 && !tpl.sizes.includes(size)) {
-        return res.status(400).json({ error: "Selected size is unavailable for this product" });
-      }
-    }
+  const input = AddToCartSchema.parse(req.body ?? {});
+  const size = input.size || undefined;
+  const color = input.color || undefined;
 
-    if (existingItem) {
-      // ✅ Update qty and price
-      existingItem.quantity += quantity;
-      if (price) existingItem.price = price; // Allow price update if needed
-    } else {
-      // ✅ Create new item
-      cart.items.push({
-        templateId,
-        designId,
-        itemType,
-        size,
-        quantity,
-        price,
-        color,
-        description,
-      });
-    }
-
-    await cart.save();
-
-    res.status(200).json({ message: "Cart updated" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to add to cart" });
+  const product = await ProductTemplate.findById(input.templateId).lean();
+  if (!product) throw new HttpError(404, "This product is no longer available.");
+  if (product.inStock === false) throw new HttpError(400, "This product is out of stock.");
+  if (!(Number(product.price) > 0)) throw new HttpError(400, "This product isn't available to buy yet.");
+  if (size && product.sizes?.length && !product.sizes.includes(size)) {
+    throw new HttpError(400, "That size isn't available for this product.");
   }
-};
+  if (color && product.colors?.length && !product.colors.includes(color)) {
+    throw new HttpError(400, "That colour isn't available for this product.");
+  }
 
+  const userId = req.user!.id;
+  const cart = (await Cart.findOne({ user: userId })) ?? new Cart({ user: userId, items: [] });
 
-// ✅ Get user's cart
-export const getCart = async (req: any, res: Response) => {
-  try {
-    const userId = req.user.id;
+  const existing = cart.items.find(
+    (item) =>
+      item.templateId?.toString() === input.templateId &&
+      (item.size ?? undefined) === size &&
+      (item.color ?? undefined) === color
+  );
 
-    const cart = await getOrCreateCart(userId);
-
-    const populated = await Cart.findById(cart._id)
-      .populate({
-        path: "items.templateId",
-        model: "ProductTemplate",
-        select: "title imageUrls price sizes colors inStock"
-      })
-      .populate({
-        path: "items.designId",
-        model: "Design",
-        select: "title imageUrl"
-      })
-      .lean();
-
-    const items = (populated?.items ?? []).map((item: any) => {
-      const product = item.templateId || {};
-      const design = item.designId || {};
-
-      const unitPrice = item.price ?? product.price ?? 0;
-      const quantity = item.quantity ?? 1;
-
-      return {
-        id: item._id,
-        title: product.title || design.title || "Untitled",
-        imageUrl: (Array.isArray(product.imageUrls) ? product.imageUrls[0] : product.imageUrl) || design.imageUrl || null,
-        inStock: product.inStock ?? true,
-        size: item.size ?? null,
-        availableSizes: Array.isArray(product.sizes) ? product.sizes : [],
-        quantity,
-        unitPrice,
-        itemTotal: +(unitPrice * quantity).toFixed(2),
-        color: item.color || null,
-        description: item.description || null
-      };
+  // The stored price is only a record of what was shown; checkout always reprices from the product.
+  if (existing) {
+    existing.quantity = Math.min(existing.quantity + input.quantity, MAX_ITEM_QUANTITY);
+    existing.price = product.price;
+  } else {
+    cart.items.push({
+      templateId: product._id,
+      itemType: product.itemType,
+      quantity: input.quantity,
+      price: product.price,
+      size,
+      color,
     });
-
-    const subtotal = items.reduce((sum, i) => sum + i.itemTotal, 0);
-
-    res.json({
-      items,
-      subtotal: +subtotal.toFixed(2),
-      total: subtotal,
-      itemCount: items.reduce((sum, i) => sum + i.quantity, 0),
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch cart" });
   }
+
+  await cart.save();
+  res.json({ message: "Cart updated" });
 };
 
-
-// ✅ Remove a single cart item
-export const removeFromCart = async (req: any, res: Response) => {
-  try {
-    const userId = req.user.id;
-    const itemId = req.params.itemId;
-
-    const cart = await getOrCreateCart(userId);
-
-    cart.items = cart.items.filter((item: any) => item._id.toString() !== itemId);
-
-    await cart.save();
-
-    res.json({ message: "Item removed", cart });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to remove item" });
-  }
+// GET /api/cart
+export const getCart = async (req: Request, res: Response) => {
+  res.json(toCartResponse(await priceCart(req.user!.id)));
 };
 
-// ✅ Clear entire cart
-export const clearCart = async (req: any, res: Response) => {
-  try {
-    const userId = req.user.id;
-
-    const cart = await getOrCreateCart(userId);
-
-    cart.items = [];
-    await cart.save();
-
-    res.json({ message: "Cart cleared" });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to clear cart" });
-  }
+// DELETE /api/cart/remove/:itemId
+export const removeFromCart = async (req: Request, res: Response) => {
+  await Cart.updateOne({ user: req.user!.id }, { $pull: { items: { _id: req.params.itemId } } });
+  res.json({ message: "Item removed" });
 };
 
-// ✅ Update item quantity
-export const updateCartQuantity = async (req: any, res: Response) => {
-  try {
-    const userId = req.user.id;
-    const { id: itemId, quantity } = req.body;
+// DELETE /api/cart/clear
+export const clearCart = async (req: Request, res: Response) => {
+  await Cart.updateOne({ user: req.user!.id }, { $set: { items: [] } });
+  res.json({ message: "Cart cleared" });
+};
 
-    if (!itemId) {
-      return res.status(400).json({ error: "Item ID is required" });
-    }
+// POST /api/cart/update
+export const updateCartQuantity = async (req: Request, res: Response) => {
+  const { id, quantity } = UpdateQuantitySchema.parse(req.body ?? {});
+  const userId = req.user!.id;
 
-    if (quantity < 1) {
-      return res.status(400).json({ error: "Quantity must be at least 1" });
-    }
+  const result = await Cart.updateOne({ user: userId, "items._id": id }, { $set: { "items.$.quantity": quantity } });
+  if (result.matchedCount === 0) throw new HttpError(404, "Item not found in cart.");
 
-    const cart = await getOrCreateCart(userId);
-
-    // ✅ Find the item
-    const item = cart.items.find((i: any) => i._id.toString() === itemId);
-
-    if (!item) {
-      return res.status(404).json({ error: "Item not found in cart" });
-    }
-
-    // ✅ Update quantity
-    item.quantity = quantity;
-
-    await cart.save();
-
-    // ✅ Return updated cart in same format as getCart
-    const populated = await Cart.findById(cart._id)
-      .populate({
-        path: "items.templateId",
-        model: "ProductTemplate",
-        select: "title imageUrls price sizes colors inStock",
-      })
-      .populate({
-        path: "items.designId",
-        model: "Design",
-        select: "title imageUrl",
-      })
-      .lean();
-
-    const items = (populated?.items ?? []).map((item: any) => {
-      const product = item.templateId || {};
-      const design = item.designId || {};
-
-      const unitPrice = item.price ?? product.price ?? 0;
-      const qty = item.quantity ?? 1;
-
-      return {
-        id: item._id,
-        title: product.title || design.title || "Untitled",
-        imageUrl: (Array.isArray(product.imageUrls) ? product.imageUrls[0] : product.imageUrl) || design.imageUrl || null,
-        inStock: product.inStock ?? true,
-        size: item.size ?? null,
-        availableSizes: Array.isArray(product.sizes) ? product.sizes : [],
-        quantity: qty,
-        unitPrice,
-        itemTotal: +(unitPrice * qty).toFixed(2),
-        color: item.color || null,
-        description: item.description || null
-      };
-    });
-
-    const subtotal = items.reduce((sum, i) => sum + i.itemTotal, 0);
-
-    res.json({
-      message: "Quantity updated",
-      items,
-      subtotal: +subtotal.toFixed(2),
-      total: subtotal,
-      itemCount: items.reduce((sum, i) => sum + i.quantity, 0),
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to update quantity" });
-  }
+  res.json({ message: "Quantity updated", ...toCartResponse(await priceCart(userId)) });
 };

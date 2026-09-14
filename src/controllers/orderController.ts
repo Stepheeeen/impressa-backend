@@ -1,232 +1,63 @@
 import { Request, Response } from "express";
-import Order from "../models/Order";
-import Cart from "../models/Cart";
+import { z } from "zod";
+import { HttpError } from "../middleware/errorHandler";
+import Order, { ORDER_STATUSES } from "../models/Order";
 
-export const createOrderForUser = async ({
-  userId,
-  reference,
-  metadata,
-  email,
-  amount,
-}: {
-  userId?: string;
-  reference: string;
-  metadata: any;
-  email?: string;
-  amount: number;
-}) => {
-  let cartItems: any[] = [];
+const StatusSchema = z.object({
+  status: z.enum(ORDER_STATUSES, { error: "Invalid order status" }),
+});
 
-  if (metadata?.cart && Array.isArray(metadata.cart)) {
-    cartItems = metadata.cart;
-  } else if (userId) {
-    const cart = await Cart.findOne({ user: userId });
-    if (!cart || !cart.items.length) throw new Error("Cart is empty.");
+// Older orders don't always store item titles, so fall back through everything that might hold one.
+function withItemNames(order: any) {
+  const obj = order.toObject();
+  obj.items = (obj.items || []).map((it: any, idx: number) => ({
+    ...it,
+    name: it.title || it.name || it.templateId?.title || it.designId?.title || obj.itemNames?.[idx] || `item-${idx + 1}`,
+  }));
+  return obj;
+}
 
-    cartItems = cart.items;
-    cart.items = [];
-    await cart.save();
-  } else {
-    throw new Error("No cart data found to create order.");
-  }
-
-  const totalAmount = amount;
-
-  const itemType =
-    metadata?.itemType || cartItems[0]?.title || "general-item";
-
-  const quantity =
-    metadata?.quantity ??
-    cartItems.reduce((acc: number, item: any) => acc + (item.quantity ?? 1), 0);
-
-  const deliveryAddress = {
-    address: metadata.address || "",
-    state: metadata.state || "",
-    country: metadata.country || "",
-    phone: metadata.phone || "",
-  };
-
-  const instructions =
-    "Delivery will take 3–7 days. Ensure your WhatsApp and email are active.";
-
-  // derive item names from cart items where possible and persist them
-  const itemNames = cartItems.map((it: any, idx: number) => {
-    return it.title || it.name || `item-${idx + 1}`;
-  });
-
-  const order = await Order.create({
-    user: userId,
-    itemType,
-    quantity,
-    totalAmount,
-    deliveryAddress,
-    paymentRef: reference,
-    status: "paid",
-    email,
-    items: cartItems,
-    itemNames, // <- persisted
-    instructions,
-  });
-
-  return order;
-};
-
+const populateItems = <T extends { populate: (...args: any[]) => T }>(query: T) =>
+  query
+    .populate({ path: "items.templateId", model: "ProductTemplate", select: "title imageUrls price sizes colors inStock" })
+    .populate({ path: "items.designId", model: "Design", select: "title imageUrl" });
 
 // GET /api/orders/:id
-export const getOrder = async (req: any, res: Response) => {
-  const isAdmin = req.user?.role === "admin";
+export const getOrder = async (req: Request, res: Response) => {
+  const user = req.user!;
+  const query = user.role === "admin" ? { _id: req.params.id } : { _id: req.params.id, user: user._id };
 
-  const orderQuery = isAdmin
-    ? { _id: req.params.id }
-    : { _id: req.params.id, user: req.user.id };
+  const order = await populateItems(Order.findOne(query));
+  if (!order) throw new HttpError(404, "Order not found");
 
-  const order = await Order.findOne(orderQuery)
-    .populate({
-      path: "items.templateId",
-      model: "ProductTemplate",
-      select: "title imageUrls price sizes colors inStock",
-    })
-    .populate({
-      path: "items.designId",
-      model: "Design",
-      select: "title imageUrl",
-    });
-  if (!order) return res.status(404).json({ error: "Order not found" });
-
-  // ensure each item has a name property for the panel/frontend
-  const obj = order.toObject();
-  obj.items = (obj.items || []).map((it: any, idx: number) => {
-    return {
-      ...it,
-      name:
-        it.title ||
-        it.name ||
-        it.templateId?.title || // <- optional chaining (safe if populate is null)
-        it.designId?.title ||
-        obj.itemNames?.[idx] || // <- safe access to persisted names
-        `item-${idx + 1}`,
-    };
-  });
-
-  res.json(obj);
+  res.json(withItemNames(order));
 };
 
-// GET /api/users/me/orders
-export const getAllOrdersForUser = async (req: any, res: Response) => {
-  try {
-    const userId = req.user.id;
-    const orders = await Order.find({ user: userId })
-      .populate({
-        path: "items.templateId",
-        model: "ProductTemplate",
-        select: "title imageUrls price sizes colors inStock",
-      })
-      .populate({
-        path: "items.designId",
-        model: "Design",
-        select: "title imageUrl",
-      })
-      .sort({ createdAt: -1 });
-
-    const transformed = orders.map((order: any) => {
-      const obj = order.toObject();
-      obj.items = (obj.items || []).map((it: any, idx: number) => ({
-        ...it,
-        name:
-          it.title ||
-          it.name ||
-          it.templateId?.title ||
-          it.designId?.title ||
-          obj.itemNames?.[idx] ||
-          `item-${idx + 1}`,
-      }));
-      return obj;
-    });
-
-    res.json(transformed);
-  } catch (err) {
-    console.error("Error fetching orders:", err);
-    res.status(500).json({ error: "Failed to fetch orders" });
-  }
+// GET /api/orders/user/me
+export const getAllOrdersForUser = async (req: Request, res: Response) => {
+  const orders = await populateItems(Order.find({ user: req.user!._id }).sort({ createdAt: -1 }));
+  res.json(orders.map(withItemNames));
 };
 
-export const getAllOrders = async (req: any, res: Response) => {
-  try {
-    const orders = await Order.find()
-      .populate("user", "name email")
-      .populate({
-        path: "items.templateId",
-        model: "ProductTemplate",
-        select: "title imageUrls price sizes colors inStock",
-      })
-      .populate({
-        path: "items.designId",
-        model: "Design",
-        select: "title imageUrl",
-      })
-      .sort({ createdAt: -1 });
-
-    const transformed = orders.map((order: any) => {
-      const obj = order.toObject();
-      obj.items = (obj.items || []).map((it: any, idx: number) => ({
-        ...it,
-        name:
-          it.title ||
-          it.name ||
-          it.templateId?.title ||
-          it.designId?.title ||
-          obj.itemNames?.[idx] ||
-          `item-${idx + 1}`,
-      }));
-      return obj;
-    });
-
-    res.status(200).json(transformed);
-  } catch (err) {
-    console.error("Error fetching all orders:", err);
-    res.status(500).json({ error: "Failed to fetch orders" });
-  }
+// GET /api/orders (admins only)
+export const getAllOrders = async (_req: Request, res: Response) => {
+  const orders = await populateItems(Order.find().populate("user", "username email").sort({ createdAt: -1 }));
+  res.json(orders.map(withItemNames));
 };
 
-// PATCH /orders/:id/status - Mark order status
-export const updateOrderStatus = async (req: any, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
+// PATCH /api/orders/:id/status (admins only)
+export const updateOrderStatus = async (req: Request, res: Response) => {
+  const { status } = StatusSchema.parse(req.body ?? {});
 
-    if (!["pending", "paid", "shipped", "delivered"].includes(status)) {
-      return res.status(400).json({ error: "Invalid order status" });
-    }
+  const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+  if (!order) throw new HttpError(404, "Order not found");
 
-    const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    );
-
-    if (!updatedOrder) {
-      return res.status(404).json({ error: "Order not found" });
-    }
-
-    res.json({
-      message: `Order marked as ${status}`,
-      order: updatedOrder,
-    });
-  } catch (err) {
-    console.error("Error updating order:", err);
-    res.status(500).json({ error: "Failed to update order" });
-  }
+  res.json({ message: `Order marked as ${status}`, order });
 };
 
-// DELETE /orders/:id - Delete an order (optional)
-export const deleteOrder = async (req: any, res: Response) => {
-  try {
-    const { id } = req.params;
-    const deleted = await Order.findByIdAndDelete(id);
-    if (!deleted) return res.status(404).json({ error: "Order not found" });
-    res.json({ message: "Order deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting order:", err);
-    res.status(500).json({ error: "Failed to delete order" });
-  }
+// DELETE /api/orders/:id (admins only)
+export const deleteOrder = async (req: Request, res: Response) => {
+  const deleted = await Order.findByIdAndDelete(req.params.id);
+  if (!deleted) throw new HttpError(404, "Order not found");
+  res.json({ message: "Order deleted successfully" });
 };

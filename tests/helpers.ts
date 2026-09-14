@@ -1,0 +1,77 @@
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
+import { MongoMemoryServer } from "mongodb-memory-server";
+import Order, { OrderStatus } from "../src/models/Order";
+import ProductTemplate from "../src/models/ProductTemplate";
+import User from "../src/models/User";
+
+let mongo: MongoMemoryServer | undefined;
+
+export async function startDatabase() {
+  mongo = await MongoMemoryServer.create();
+  await mongoose.connect(mongo.getUri());
+  // Build unique indexes before tests rely on them.
+  await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
+}
+
+export async function stopDatabase() {
+  await mongoose.disconnect();
+  await mongo?.stop();
+}
+
+export async function clearDatabase() {
+  await Promise.all(Object.values(mongoose.connection.collections).map((collection) => collection.deleteMany({})));
+}
+
+const suffix = () => crypto.randomBytes(4).toString("hex");
+
+export async function createUser(overrides: { email?: string; password?: string; role?: "user" | "admin" } = {}) {
+  const password = overrides.password ?? "correct-horse-battery";
+  const id = suffix();
+  const user = await User.create({
+    username: `user_${id}`,
+    email: overrides.email ?? `user_${id}@example.com`,
+    password: await bcrypt.hash(password, 4),
+    role: overrides.role ?? "user",
+  });
+  const token = jwt.sign({ id: user.id, role: user.role, tv: user.tokenVersion }, process.env.JWT_SECRET!, {
+    expiresIn: "1h",
+  });
+  return { user, password, token };
+}
+
+export const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+export function createProduct(overrides: Record<string, unknown> = {}) {
+  return ProductTemplate.create({
+    title: "Luxury Dress",
+    itemType: "dress",
+    category: "fashion & clothings",
+    imageUrls: ["https://res.cloudinary.com/demo/image/upload/dress.jpg"],
+    price: 9000,
+    sizes: ["M", "L", "XL"],
+    colors: ["red", "black"],
+    ...overrides,
+  });
+}
+
+export function createOrder(userId: unknown, overrides: { status?: OrderStatus; totalAmount?: number } = {}) {
+  return Order.create({
+    user: userId,
+    itemType: "Luxury Dress",
+    quantity: 1,
+    totalAmount: overrides.totalAmount ?? 10500,
+    deliveryAddress: { address: "12 Admiralty Way, Lekki", state: "Lagos", country: "Nigeria", phone: "08012345678" },
+    paymentRef: `ref_${suffix()}`,
+    status: overrides.status ?? "paid",
+    email: "buyer@example.com",
+  });
+}
+
+export function signedWebhook(payload: unknown) {
+  const body = JSON.stringify(payload);
+  const signature = crypto.createHmac("sha512", process.env.PAYSTACK_SECRET_KEY!).update(body).digest("hex");
+  return { body, signature };
+}

@@ -1,20 +1,23 @@
 import express from "express";
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate, setProductStock, getTemplateById, editTemplate } from "../controllers/templateController";
 import { protect } from "../middleware/authMiddleware";
+import { asyncHandler } from "../middleware/errorHandler";
 import { isAdmin } from "../middleware/isAdmin";
+import { validateObjectId } from "../middleware/validate";
 
 const router = express.Router();
+const validId = validateObjectId("id");
 
-router.get("/", getTemplates);
-router.get("/:id", getTemplateById);
+router.get("/", asyncHandler(getTemplates));
+router.get("/:id", validId, asyncHandler(getTemplateById));
 
-router.post("/", protect, isAdmin, createTemplate);
+router.post("/", protect, isAdmin, asyncHandler(createTemplate));
 
-router.put("/:id", protect, isAdmin, updateTemplate);
-router.put("/:id/edit", protect, isAdmin, editTemplate);
+router.put("/:id", protect, isAdmin, validId, asyncHandler(updateTemplate));
+router.put("/:id/edit", protect, isAdmin, validId, asyncHandler(editTemplate));
 
-router.delete("/:id", protect, isAdmin, deleteTemplate);
+router.delete("/:id", protect, isAdmin, validId, asyncHandler(deleteTemplate));
 
-router.patch("/:id/stock", protect, isAdmin, setProductStock);
+router.patch("/:id/stock", protect, isAdmin, validId, asyncHandler(setProductStock));
 
 export default router;

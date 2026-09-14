@@ -1,32 +1,40 @@
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { env } from "../config/env";
 import User from "../models/User";
+import { isObjectId } from "./validate";
 
-export const protect = async (req: Request & { user?: any }, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization || req.headers.Authorization;
-  if (!authHeader || typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
+type TokenPayload = { id?: string; tv?: number };
+
+export const protect = async (req: Request, res: Response, next: NextFunction) => {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Not authorized, token missing" });
   }
 
-  const token = authHeader.split(" ")[1];
+  let payload: TokenPayload;
+  try {
+    payload = jwt.verify(header.slice("Bearer ".length), env.JWT_SECRET, { algorithms: ["HS256"] }) as TokenPayload;
+  } catch (err: any) {
+    // Expired tokens are reported explicitly so clients can prompt the user to sign in again.
+    if (err?.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "TokenExpired", message: "JWT expired", expiredAt: err.expiredAt });
+    }
+    return res.status(401).json({ error: "Not authorized" });
+  }
 
   try {
-    const secret = process.env.JWT_SECRET as string;
-    if (!secret) throw new Error("JWT_SECRET not set");
-
-    const decoded = jwt.verify(token, secret) as { id: string };
-    const user = await User.findById(decoded.id).select("-password");
+    const user = isObjectId(payload.id) ? await User.findById(payload.id).select("-password") : null;
     if (!user) return res.status(401).json({ error: "Not authorized, user not found" });
+
+    // Resetting a password bumps tokenVersion, which retires every token issued before it.
+    if ((payload.tv ?? 0) !== (user.tokenVersion ?? 0)) {
+      return res.status(401).json({ error: "Your session has ended. Sign in again." });
+    }
 
     req.user = user;
     next();
-  } catch (err: any) {
-    // Expired tokens should be handled explicitly so frontend can refresh or prompt login
-    if (err.name === "TokenExpiredError") {
-      return res.status(401).json({ error: "TokenExpired", message: "JWT expired", expiredAt: err.expiredAt });
-    }
-
-    console.error("Auth middleware error:", err);
-    return res.status(401).json({ error: "Not authorized" });
+  } catch (err) {
+    next(err);
   }
 };

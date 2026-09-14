@@ -1,5 +1,8 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export const ORDER_STATUSES = ["pending", "paid", "shipped", "delivered"] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
 export interface IOrder extends Document {
   user: mongoose.Types.ObjectId;
   itemType: string;
@@ -11,7 +14,7 @@ export interface IOrder extends Document {
     country: string;
     phone: string;
   };
-  status: "pending" | "paid" | "shipped" | "delivered";
+  status: OrderStatus;
   paymentRef: string;
   email?: string;
   items?: any[];
@@ -21,7 +24,7 @@ export interface IOrder extends Document {
 
 const OrderSchema = new Schema(
   {
-    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
 
     itemType: { type: String, required: true },
     quantity: { type: Number, required: true },
@@ -34,11 +37,12 @@ const OrderSchema = new Schema(
       phone: { type: String, required: true },
     },
 
-    paymentRef: { type: String, required: true },
+    // Unique so the verify call and Paystack's webhook can't both create an order for one payment.
+    paymentRef: { type: String, required: true, unique: true },
 
     status: {
       type: String,
-      enum: ["pending", "paid", "shipped", "delivered"],
+      enum: ORDER_STATUSES,
       default: "paid",
     },
 
