@@ -57,7 +57,7 @@ describe("support assistant", () => {
 
     expect(res.body).toMatchObject({ reply: "You can ask for a return within 5 days of delivery.", handoffSuggested: false, canEmailSupport: true });
     const params = createMock.mock.calls[0][0];
-    expect(params.model).toBe("claude-haiku-4-5-20251001");
+    expect(params.model).toBe("claude-haiku-4-5");
     expect(params.system).toContain("within 5 days of delivery");
     expect(params.tools?.map((tool) => tool.name)).toEqual(["hand_off_to_support"]);
   });

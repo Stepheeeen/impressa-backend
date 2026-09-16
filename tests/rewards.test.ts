@@ -10,7 +10,11 @@ const DAY = 24 * 60 * 60 * 1000;
 
 beforeAll(startDatabase);
 afterAll(stopDatabase);
-beforeEach(clearDatabase);
+// The games ship switched off, so the tests that exercise them turn them on.
+beforeEach(async () => {
+  await clearDatabase();
+  await setRewardSettings({ checkInEnabled: true, scratchCardsEnabled: true });
+});
 
 async function customerWithOrder() {
   const customer = await createUser();
@@ -75,6 +79,14 @@ describe("daily check-in", () => {
     await setRewardSettings({ checkInEnabled: false });
     const { token } = await customerWithOrder();
     await checkIn(token).expect(403);
+  });
+
+  it("is off until an admin switches it on", async () => {
+    await clearDatabase();
+    const { token } = await customerWithOrder();
+
+    await checkIn(token).expect(403);
+    await scratch(token).expect(403);
   });
 });
 

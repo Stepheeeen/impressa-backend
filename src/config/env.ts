@@ -33,7 +33,7 @@ const EnvSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional(),
   // The support chat assistant. Without a key the chat says it's unavailable and points to email.
   ANTHROPIC_API_KEY: z.string().optional(),
-  SUPPORT_MODEL: z.string().default("claude-haiku-4-5-20251001"),
+  SUPPORT_MODEL: z.string().default("claude-haiku-4-5"),
   // Where customers' escalated chats are emailed, and the address the assistant gives out.
   SUPPORT_EMAIL: z.email("SUPPORT_EMAIL must be an email address").optional(),
 });

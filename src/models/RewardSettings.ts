@@ -30,8 +30,10 @@ const RewardSettingsSchema = new Schema(
     walletEnabled: { type: Boolean, default: true },
     couponsEnabled: { type: Boolean, default: true },
     cashbackEnabled: { type: Boolean, default: true },
-    checkInEnabled: { type: Boolean, default: true },
-    scratchCardsEnabled: { type: Boolean, default: true },
+    // The daily games stay off until the client settles the mechanics (skill or chance) and the
+    // FCCPC position. Coupons and cashback run without them; an admin can switch them on later.
+    checkInEnabled: { type: Boolean, default: false },
+    scratchCardsEnabled: { type: Boolean, default: false },
     rewardsRequirePurchase: { type: Boolean, default: true },
     creditExpiryDays: { type: Number, default: 90 },
     walletUsageMode: { type: String, enum: WALLET_USAGE_MODES, default: "whole-order" },

@@ -4,7 +4,7 @@ import app from "../src/app";
 import CouponRedemption from "../src/models/CouponRedemption";
 import WalletTransaction from "../src/models/WalletTransaction";
 import { holdWalletCredit } from "../src/services/wallet";
-import { auth, clearDatabase, createOrder, createUser, startDatabase, stopDatabase } from "./helpers";
+import { auth, clearDatabase, createOrder, createUser, setRewardSettings, startDatabase, stopDatabase } from "./helpers";
 
 beforeAll(startDatabase);
 afterAll(stopDatabase);
@@ -123,6 +123,7 @@ describe("coupons", () => {
 
 describe("rewards summary", () => {
   it("shows this month's game rewards against the budget", async () => {
+    await setRewardSettings({ checkInEnabled: true });
     const admin = await createUser({ role: "admin" });
     const customer = await createUser();
     await createOrder(customer.user._id, { status: "delivered" });
