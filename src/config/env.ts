@@ -38,7 +38,7 @@ const EnvSchema = z.object({
   SUPPORT_EMAIL: z.email("SUPPORT_EMAIL must be an email address").optional(),
 });
 
-const REQUIRED_IN_PRODUCTION = ["CORS_ORIGINS", "APP_URL", "RESEND_API_KEY", "EMAIL_FROM"] as const;
+const REQUIRED_IN_PRODUCTION = ["CORS_ORIGINS", "APP_URL"] as const;
 
 function loadEnv() {
   const parsed = EnvSchema.safeParse(process.env);
@@ -52,6 +52,12 @@ function loadEnv() {
     if (missing.length > 0) {
       console.error(`Missing required production environment variables: ${missing.join(", ")}`);
       process.exit(1);
+    }
+    // Email is optional so the API can run before Resend is set up, but say so loudly.
+    if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+      console.warn(
+        "Email is not configured (RESEND_API_KEY, EMAIL_FROM). Password resets and support hand-off emails are turned off until you set them."
+      );
     }
     if (parsed.data.JWT_SECRET.length < 32) {
       console.warn("JWT_SECRET is shorter than 32 characters. Rotate it to a longer random value.");

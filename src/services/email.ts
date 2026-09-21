@@ -4,6 +4,15 @@ import { env } from "../config/env";
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
+export const isEmailConfigured = () => resend !== null;
+
+// In production a missing email setup is an error; locally we log instead so development still works.
+function emailUnavailable(what: string) {
+  const message = `${what} not sent: set RESEND_API_KEY and EMAIL_FROM.`;
+  Sentry.captureMessage(message, "warning");
+  return new Error(message);
+}
+
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 
@@ -43,6 +52,7 @@ export async function sendSupportEscalationEmail({
     </div>`;
 
   if (!resend) {
+    if (env.NODE_ENV === "production") throw emailUnavailable("Support request");
     console.log(`[email] Support request from ${customerEmail} to ${to}:\n${text}`);
     return;
   }
@@ -70,7 +80,7 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
       <p>We received a request to reset the password for your Impressa account.</p>
       <p>
         <a href="${escapeHtml(resetUrl)}"
-           style="display: inline-block; background: #800020; color: #FAF9F6; padding: 12px 20px; border-radius: 6px; text-decoration: none;">
+           style="display: inline-block; background: #6D22B0; color: #FFFFFF; padding: 12px 20px; border-radius: 6px; text-decoration: none;">
           Reset password
         </a>
       </p>
@@ -78,7 +88,8 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
     </div>`;
 
   if (!resend) {
-    // Production refuses to start without RESEND_API_KEY, so this only happens locally.
+    // Only ever print a working reset link on a developer's own machine.
+    if (env.NODE_ENV === "production") throw emailUnavailable("Password reset email");
     console.log(`[email] Password reset link for ${to}: ${resetUrl}`);
     return;
   }

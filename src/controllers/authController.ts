@@ -10,7 +10,7 @@ import Design from "../models/Design";
 import DeviceToken from "../models/DeviceToken";
 import Order from "../models/Order";
 import User, { IUser } from "../models/User";
-import { sendPasswordResetEmail } from "../services/email";
+import { isEmailConfigured, sendPasswordResetEmail } from "../services/email";
 
 const BCRYPT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -125,6 +125,10 @@ export const getMe = async (req: Request, res: Response) => {
 // POST /api/auth/forgot-password
 export const forgotPassword = async (req: Request, res: Response) => {
   const { email } = ForgotPasswordSchema.parse(req.body ?? {});
+  // Checked before the account lookup, so the answer is the same whether or not the account exists.
+  if (env.NODE_ENV === "production" && !isEmailConfigured()) {
+    throw new HttpError(503, "Password reset by email isn't available right now. Contact support and we'll help you in.");
+  }
   const user = await User.findOne({ email }).collation(CASE_INSENSITIVE);
 
   if (user) {
