@@ -10,7 +10,7 @@ const EnvSchema = z.object({
   MONGO_URI: z.string().min(1, "MONGO_URI is required"),
   JWT_SECRET: z.string().min(1, "JWT_SECRET is required"),
   PAYSTACK_SECRET_KEY: z.string().min(1, "PAYSTACK_SECRET_KEY is required"),
-  // Comma-separated browser origins allowed to call the API, e.g. https://impressa.ng,https://admin.impressa.ng
+  // Comma-separated browser origins allowed to call the API, e.g. https://impressaenterprise.com,https://admin.impressaenterprise.com
   CORS_ORIGINS: z.string().default(""),
   // Base URL of the website, used for links in emails.
   APP_URL: z.url().default("http://localhost:3000"),
